@@ -1,0 +1,752 @@
+import React, { useState, useEffect } from "react";
+import {
+  StyleSheet,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useRouter } from "expo-router";
+import { Storage } from "@/utils/storage";
+import axios from "axios";
+import { socketService } from "@/utils/socket";
+
+import { Translations } from "@/constants/translations";
+
+const t = Translations.uz.waiter;
+const API_BASE_URL = "http://192.168.43.160:3000";
+
+export default function WaiterStationScreen() {
+  const router = useRouter();
+  const colorScheme = useColorScheme() ?? "light";
+  const colors = Colors[colorScheme];
+
+  const [activeTab, setActiveTab] = useState<"tables" | "myOrders">("tables");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [tables, setTables] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
+
+  const fetchData = async () => {
+    try {
+      const token = await Storage.getItem("access_token");
+      const userStr = await Storage.getItem("user");
+      if (userStr) {
+        setUser(JSON.parse(userStr));
+      }
+
+      // Fetch Tables
+      const tablesRes = await axios.get(`${API_BASE_URL}/tables`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const fetchedTables = tablesRes.data.sort(
+        (a: any, b: any) => parseInt(a.number) - parseInt(b.number),
+      );
+      setTables(fetchedTables);
+
+      // Set default floor
+      if (fetchedTables.length > 0 && selectedFloor === null) {
+        const floors = [
+          ...new Set(fetchedTables.map((t: any) => t.floor || 1)),
+        ].sort((a: any, b: any) => (a as number) - (b as number)) as number[];
+        setSelectedFloor(floors[0]);
+      }
+
+      // Fetch Today's Orders
+      const now = new Date();
+      const startOfDay = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+      ).toISOString();
+      const endOfDay = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        23,
+        59,
+        59,
+      ).toISOString();
+
+      const ordersRes = await axios.get(
+        `${API_BASE_URL}/orders?startDate=${startOfDay}&endDate=${endOfDay}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      setOrders(ordersRes.data);
+    } catch (error) {
+      console.error("Waiter fetch error:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    const socket = socketService.getSocket();
+
+    socket.on("orderCreated", (newOrder: any) => {
+      setOrders((prev) => [newOrder, ...prev]);
+    });
+
+    socket.on("orderUpdated", (updatedOrder: any) => {
+      setOrders((prev) =>
+        prev.map((o) => (o._id === updatedOrder._id ? updatedOrder : o)),
+      );
+    });
+
+    socket.on("itemReady", (data: any) => {
+      // Only notify if this is my order
+      if (data.waiterId === user?._id) {
+        Alert.alert(
+          "Taom Tayyor!",
+          `${data.tableName}-stol uchun "${data.itemName}" tayyor bo'ldi.`,
+          [{ text: "Tushunarli" }],
+        );
+      }
+    });
+
+    socket.on("tableUpdated", (updatedTable: any) => {
+      setTables((prev) =>
+        prev.map((t) => (t._id === updatedTable._id ? updatedTable : t)),
+      );
+    });
+
+    return () => {
+      socket.off("orderCreated");
+      socket.off("orderUpdated");
+      socket.off("itemReady");
+      socket.off("tableUpdated");
+    };
+  }, []);
+
+  const handleConfirmPayment = async (orderId: string) => {
+    Alert.alert(
+      "To'lovni tasdiqlash",
+      "Haqiqatan ham ushbu buyurtma uchun to'lov qabul qilindimi?",
+      [
+        { text: "Yo'q", style: "cancel" },
+        {
+          text: "Ha",
+          onPress: async () => {
+            try {
+              const token = await Storage.getItem("access_token");
+              await axios.put(
+                `${API_BASE_URL}/orders/${orderId}`,
+                { status: "Paid" },
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                },
+              );
+              fetchData();
+            } catch (error) {
+              console.error("Payment confirmation error:", error);
+              Alert.alert("Xatolik", "To'lovni tasdiqlashda xatolik yuz berdi");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleLogout = async () => {
+    await Storage.removeItem("access_token");
+    await Storage.removeItem("user");
+    router.replace("/login");
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData();
+  };
+
+  const StatBox = ({ label, value, color }: any) => (
+    <View style={[styles.statBox, { backgroundColor: color + "10" }]}>
+      <Text style={[styles.statValue, { color: color }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: color }]}>{label}</Text>
+    </View>
+  );
+
+  const myOrders = orders.filter((o) => o.waiterId === user?._id);
+  const floors = [...new Set(tables.map((t: any) => t.floor || 1))].sort(
+    (a: any, b: any) => (a as number) - (b as number),
+  ) as number[];
+  const filteredTables = tables.filter((t) => (t.floor || 1) === selectedFloor);
+
+  const getReadinessIndicators = (order: any) => {
+    if (!order || !order.items) return null;
+    const departments = {
+      oshpaz: { icon: "chef-hat", color: "#F59E0B" },
+      bar: { icon: "glass-cocktail", color: "#3B82F6" },
+      shashlikchi: { icon: "fire", color: "#EF4444" },
+      salatchi: { icon: "leaf", color: "#10B981" },
+    };
+
+    const readyStats: { [key: string]: boolean } = {};
+    order.items.forEach((item: any) => {
+      if (item.status === "Ready" && item.department) {
+        readyStats[item.department] = true;
+      }
+    });
+
+    return Object.keys(readyStats).map((dept) => {
+      const config = departments[dept as keyof typeof departments] || {
+        icon: "food",
+        color: colors.primary,
+      };
+      return (
+        <View
+          key={dept}
+          style={[styles.miniBadge, { backgroundColor: config.color + "20" }]}
+        >
+          <MaterialCommunityIcons
+            name={config.icon as any}
+            size={12}
+            color={config.color}
+          />
+        </View>
+      );
+    });
+  };
+
+  const TableCard = ({ table }: { table: any }) => {
+    const tableOrders = orders.filter(
+      (o) => o.tableName === table.number.toString(),
+    );
+    const activeOrder = tableOrders.find(
+      (o) => o.status !== "Paid" && o.status !== "Cancelled",
+    );
+    const status = activeOrder ? activeOrder.status : "Vacant";
+
+    let statusColor = colors.accent;
+    let statusIcon: any = "clock-outline";
+
+    if (status === "Ready") {
+      statusColor = colors.success;
+      statusIcon = "check-circle-outline";
+    } else if (status === "Vacant") {
+      statusColor = colors.secondary;
+      statusIcon = "plus";
+    }
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.tableCard,
+          {
+            backgroundColor:
+              status === "Vacant" ? colors.background : colors.card,
+          },
+          status !== "Vacant" && { borderColor: statusColor, borderWidth: 1 },
+        ]}
+        onPress={() => {
+          router.push({
+            pathname: "/create-order",
+            params: {
+              tableId: table._id,
+              tableName: table.number,
+              orderId: activeOrder?._id || "",
+            },
+          });
+        }}
+      >
+        <View style={styles.tableHeader}>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <View style={styles.tableNameRow}>
+              <MaterialCommunityIcons
+                name="table-chair"
+                size={16}
+                color={status === "Vacant" ? colors.secondary : colors.text}
+              />
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.tableId,
+                  {
+                    color: status === "Vacant" ? colors.secondary : colors.text,
+                  },
+                ]}
+              >
+                {table.number}
+              </Text>
+            </View>
+            <View style={styles.floorNameRow}>
+              <MaterialCommunityIcons
+                name="layers-outline"
+                size={12}
+                color={colors.secondary}
+              />
+              <Text
+                numberOfLines={1}
+                style={[styles.floorTextMini, { color: colors.secondary }]}
+              >
+                {table.floor || 1}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.badgeRow}>
+            {activeOrder && getReadinessIndicators(activeOrder)}
+            <MaterialCommunityIcons
+              name={statusIcon}
+              size={18}
+              color={statusColor}
+            />
+          </View>
+        </View>
+
+        {status === "Vacant" ? (
+          <View style={styles.vacantContent}>
+            <MaterialCommunityIcons
+              name="plus"
+              size={24}
+              color={colors.secondary}
+            />
+            <Text style={[styles.vacantText, { color: colors.secondary }]}>
+              {t.newOrder}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.activeContent}>
+            <View style={styles.waiterInfo}>
+              <MaterialCommunityIcons
+                name="account-outline"
+                size={12}
+                color={colors.secondary}
+              />
+              <Text style={[styles.waiterName, { color: colors.secondary }]}>
+                {activeOrder.waiterName || "Ofitsiant"}
+              </Text>
+            </View>
+            <Text style={[styles.guestsText, { color: colors.secondary }]}>
+              {t.guests.replace("{count}", table.capacity)}
+            </Text>
+            <View style={styles.activeMeta}>
+              <View style={styles.metaRow}>
+                <Text style={[styles.metaLabel, { color: colors.secondary }]}>
+                  {t.amount}
+                </Text>
+                <Text style={[styles.metaAmount, { color: statusColor }]}>
+                  {activeOrder.totalAmount?.toLocaleString()}{" "}
+                  {Translations.uz.common.currency}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.payBtn, { backgroundColor: colors.primary }]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleConfirmPayment(activeOrder._id);
+              }}
+            >
+              <Text style={styles.payBtnText}>To'lov</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const OrderRow = ({ order }: { order: any }) => (
+    <TouchableOpacity
+      style={[styles.orderRow, { backgroundColor: colors.card }]}
+      onPress={() => {
+        router.push({
+          pathname: "/create-order",
+          params: {
+            tableId: order.tableId,
+            tableName: order.tableName,
+            orderId: order._id,
+          },
+        });
+      }}
+    >
+      <View style={styles.orderLeft}>
+        <View
+          style={[
+            styles.tableNumberCircle,
+            { backgroundColor: colors.primary + "15" },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name="table-chair"
+            size={14}
+            color={colors.primary}
+          />
+          <Text style={[styles.tableNumberText, { color: colors.primary }]}>
+            {order.tableName}
+          </Text>
+        </View>
+        <View>
+          <Text style={[styles.orderTimeText, { color: colors.secondary }]}>
+            {new Date(order.createdAt).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </Text>
+          <Text style={[styles.orderStatusText, { color: colors.text }]}>
+            {order.status === "Paid" ? "To'langan" : "Faol"}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.orderRight}>
+        <View style={styles.badgeRow}>{getReadinessIndicators(order)}</View>
+        <Text style={[styles.orderAmountText, { color: colors.text }]}>
+          {order.totalAmount?.toLocaleString()}{" "}
+          {Translations.uz.common.currency}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <View style={styles.header}>
+        <View style={styles.headerTitleRow}>
+          <View style={[styles.titleIcon, { backgroundColor: colors.accent }]}>
+            <MaterialCommunityIcons
+              name="shopping-outline"
+              size={24}
+              color="white"
+            />
+          </View>
+          <View>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {t.title}
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: colors.secondary }]}>
+              {user?.fullName || "Waiter"}
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <MaterialCommunityIcons
+            name="logout"
+            size={24}
+            color={colors.secondary}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.statsRow}>
+        <StatBox
+          label={t.tablesActive}
+          value={`${tables.filter((t) => t.status === "Active").length}/${tables.length}`}
+          color={colors.primary}
+        />
+        <StatBox
+          label={t.ordersReady}
+          value={orders.filter((o) => o.status === "Ready").length}
+          color={colors.success}
+        />
+        <StatBox
+          label="Tushum"
+          value={`${orders
+            .reduce(
+              (acc, o) => acc + (o.status === "Paid" ? o.totalAmount : 0),
+              0,
+            )
+            .toLocaleString()}`}
+          color={colors.accent}
+        />
+      </View>
+
+      <View style={styles.tabSwitcher}>
+        <TouchableOpacity
+          style={[
+            styles.tabItem,
+            activeTab === "tables" && { backgroundColor: colors.primary },
+          ]}
+          onPress={() => setActiveTab("tables")}
+        >
+          <MaterialCommunityIcons
+            name="view-grid-outline"
+            size={20}
+            color={activeTab === "tables" ? "white" : colors.secondary}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              { color: activeTab === "tables" ? "white" : colors.secondary },
+            ]}
+          >
+            Stollar
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tabItem,
+            activeTab === "myOrders" && { backgroundColor: colors.primary },
+          ]}
+          onPress={() => setActiveTab("myOrders")}
+        >
+          <MaterialCommunityIcons
+            name="clipboard-list-outline"
+            size={20}
+            color={activeTab === "myOrders" ? "white" : colors.secondary}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              { color: activeTab === "myOrders" ? "white" : colors.secondary },
+            ]}
+          >
+            Buyurtmalarim
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {activeTab === "tables" && (
+        <View style={styles.floorSelector}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.floorScroll}
+          >
+            {floors.map((floor) => (
+              <TouchableOpacity
+                key={floor}
+                style={[
+                  styles.floorItem,
+                  selectedFloor === floor && {
+                    backgroundColor: colors.primary,
+                    borderColor: colors.primary,
+                  },
+                ]}
+                onPress={() => setSelectedFloor(floor)}
+              >
+                <Text
+                  style={[
+                    styles.floorText,
+                    selectedFloor === floor && { color: "white" },
+                  ]}
+                >
+                  {floor}-qavat
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {loading ? (
+        <ActivityIndicator
+          size="large"
+          color={colors.primary}
+          style={{ marginTop: 50 }}
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {activeTab === "tables" ? (
+            <View style={styles.tableGrid}>
+              {filteredTables.map((table) => (
+                <TableCard key={table._id} table={table} />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.myOrdersList}>
+              {myOrders.length === 0 ? (
+                <Text style={[styles.emptyText, { color: colors.secondary }]}>
+                  Bugun hali buyurtma qabul qilmadingiz
+                </Text>
+              ) : (
+                myOrders.map((order) => (
+                  <OrderRow key={order._id} order={order} />
+                ))
+              )}
+            </View>
+          )}
+          <View style={styles.bottomSpace} />
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  headerTitleRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  titleIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: { fontSize: 20, fontWeight: "bold" },
+  headerSubtitle: { fontSize: 13 },
+  logoutButton: { padding: 8 },
+  statsRow: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    gap: 12,
+    marginBottom: 24,
+  },
+  statBox: {
+    flex: 1,
+    height: 80,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  statValue: { fontSize: 22, fontWeight: "bold" },
+  statLabel: { fontSize: 12, fontWeight: "600" },
+  tabSwitcher: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    backgroundColor: "rgba(0,0,0,0.05)",
+    borderRadius: 15,
+    padding: 4,
+    marginBottom: 20,
+  },
+  tabItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  tabText: { fontSize: 14, fontWeight: "600" },
+  floorSelector: { marginBottom: 15 },
+  floorScroll: { paddingHorizontal: 20, gap: 10 },
+  floorItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  floorText: { fontSize: 14, fontWeight: "600", color: "#64748B" },
+  floorTextMini: { fontSize: 11, fontWeight: "500", marginTop: -2 },
+  scrollContent: { paddingHorizontal: 20 },
+  tableGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  tableCard: {
+    width: "47%",
+    borderRadius: 24,
+    padding: 16,
+    minHeight: 160,
+    backgroundColor: "white",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  tableId: { fontSize: 18, fontWeight: "800", marginLeft: 4 },
+  tableNameRow: { flexDirection: "row", alignItems: "center", marginBottom: 2 },
+  floorNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  badgeRow: { flexDirection: "row", gap: 4, alignItems: "center" },
+  miniBadge: {
+    padding: 2,
+    borderRadius: 6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  vacantContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: "#CBD5E1",
+    borderRadius: 16,
+    marginVertical: 4,
+  },
+  vacantText: { fontSize: 14, fontWeight: "600" },
+  activeContent: { flex: 1, gap: 4 },
+  waiterInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 4,
+  },
+  waiterName: { fontSize: 12, fontWeight: "500" },
+  guestsText: { fontSize: 14, fontWeight: "500", marginBottom: 12 },
+  activeMeta: { gap: 6 },
+  metaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  metaLabel: { fontSize: 11, fontWeight: "500" },
+  metaAmount: { fontSize: 14, fontWeight: "bold" },
+  payBtn: {
+    marginTop: 12,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  payBtnText: { color: "white", fontSize: 13, fontWeight: "bold" },
+  myOrdersList: { gap: 12 },
+  orderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 1,
+  },
+  orderLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  tableNumberCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tableNumberText: { fontSize: 16, fontWeight: "bold" },
+  orderTimeText: { fontSize: 12, fontWeight: "500" },
+  orderStatusText: { fontSize: 14, fontWeight: "600" },
+  orderRight: { alignItems: "flex-end", gap: 4 },
+  orderAmountText: { fontSize: 15, fontWeight: "bold" },
+  emptyText: { textAlign: "center", marginTop: 50, fontSize: 14 },
+  bottomSpace: { height: 40 },
+});

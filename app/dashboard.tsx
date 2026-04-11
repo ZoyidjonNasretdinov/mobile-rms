@@ -15,6 +15,7 @@ import { Colors } from "@/constants/theme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import axios from "axios";
+import { socketService } from "@/utils/socket";
 
 import { Translations } from "@/constants/translations";
 
@@ -29,14 +30,25 @@ export default function DashboardScreen() {
     active: 0,
     total: 0,
   });
+  const [revenue, setRevenue] = useState(0);
+  const [orderCount, setOrderCount] = useState(0);
+  const [role, setRole] = useState("");
 
   useEffect(() => {
-    const loadData = async () => {
+    const fetchDashboardData = async () => {
       // Load user info
       const userStr = await Storage.getItem("user");
       if (userStr) {
         const user = JSON.parse(userStr);
         setUserName(user.fullName || user.name || t.title);
+        setRole(user.role);
+
+        // Auto-redirect roles to their stations if not owner
+        const userRole = user.role?.toLowerCase();
+        if (userRole === "ofisiant") router.replace("/waiter");
+        if (["oshpaz", "shashlikchi", "salatchi", "bar"].includes(userRole))
+          router.replace("/kitchen");
+        if (userRole === "kassier") router.replace("/cashier");
       }
 
       // Load staff stats
@@ -48,11 +60,50 @@ export default function DashboardScreen() {
         const staff = response.data;
         const active = staff.filter((s: any) => s.isActive).length;
         setActiveStaffCount({ active, total: staff.length });
+
+        // Load revenue and order stats for TODAY
+        const now = new Date();
+        const startOfDay = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+        ).toISOString();
+        const endOfDay = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          23,
+          59,
+          59,
+        ).toISOString();
+
+        const statsRes = await axios.get(
+          `http://192.168.43.160:3000/orders/stats?startDate=${startOfDay}&endDate=${endOfDay}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        setRevenue(statsRes.data.totalRevenue);
+        setOrderCount(statsRes.data.totalOrderCount);
       } catch (error) {
         console.error("Dashboard fetch error:", error);
       }
     };
-    loadData();
+
+    fetchDashboardData();
+
+    const socket = socketService.getSocket();
+    const handleUpdate = () => fetchDashboardData();
+
+    socket.on("orderCreated", handleUpdate);
+    socket.on("orderUpdated", handleUpdate);
+    socket.on("staffStatusChanged", handleUpdate);
+
+    return () => {
+      socket.off("orderCreated", handleUpdate);
+      socket.off("orderUpdated", handleUpdate);
+      socket.off("staffStatusChanged", handleUpdate);
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -167,15 +218,16 @@ export default function DashboardScreen() {
         <View style={styles.perfGrid}>
           <PerformanceCard
             title={t.revenue}
-            value={`6,890 ${Translations.uz.common.currency}`}
+            value={`${revenue.toLocaleString()} ${Translations.uz.common.currency}`}
             change="+12%"
             icon="currency-usd"
             iconColor="#10B981"
             bgColor="#10B98115"
+            onPress={() => router.push("/cashier?tab=history")}
           />
           <PerformanceCard
             title={t.orders}
-            value="72"
+            value={orderCount.toString()}
             change="+8%"
             icon="cart-outline"
             iconColor="#3B82F6"
@@ -206,42 +258,76 @@ export default function DashboardScreen() {
           {t.quickActions}
         </Text>
         <View style={styles.actionGrid}>
-          <QuickAction
-            title={t.staff}
-            icon="account-group"
-            color="#3B82F6"
-            onPress={() => router.push("/staff")}
-          />
-          <QuickAction
-            title={t.inventory}
-            icon="package-variant-closed"
-            color="#8B5CF6"
-            onPress={() => router.push("/inventory")}
-          />
-          <QuickAction
-            title={Translations.uz.procurement.title}
-            icon="cart-outline"
-            color="#F59E0B"
-            onPress={() => router.push("/procurement")}
-          />
-          <QuickAction
-            title={Translations.uz.partners.title}
-            icon="handshake-outline"
-            color="#10B981"
-            onPress={() => router.push("/partners")}
-          />
-          <QuickAction
-            title={Translations.uz.menu.title}
-            icon="silverware-fork-knife"
-            color="#EC4899"
-            onPress={() => router.push("/menu")}
-          />
-          <QuickAction
-            title={Translations.uz.eodReport.title}
-            icon="chart-box-outline"
-            color="#6366F1"
-            onPress={() => router.push("/reports")}
-          />
+          {[
+            {
+              title: t.staff,
+              icon: "account-group",
+              color: "#3B82F6",
+              onPress: () => router.push("/staff"),
+            },
+            {
+              title: "Stollar",
+              icon: "table-chair",
+              color: "#00AEEF",
+              onPress: () => router.push("/tables-admin"),
+            },
+            {
+              title: t.inventory,
+              icon: "package-variant-closed",
+              color: "#8B5CF6",
+              onPress: () => router.push("/inventory"),
+            },
+            {
+              title: Translations.uz.procurement.title,
+              icon: "cart-outline",
+              color: "#F59E0B",
+              onPress: () => router.push("/procurement"),
+            },
+            {
+              title: Translations.uz.partners.title,
+              icon: "handshake-outline",
+              color: "#10B981",
+              onPress: () => router.push("/partners"),
+            },
+            {
+              title: Translations.uz.menu.title,
+              icon: "silverware-fork-knife",
+              color: "#EC4899",
+              onPress: () => router.push("/menu"),
+            },
+            {
+              title: Translations.uz.products.title,
+              icon: "cube-outline",
+              color: "#EC4899",
+              onPress: () => router.push("/products"),
+            },
+            role === "owner"
+              ? {
+                  title: Translations.uz.eodReport.title,
+                  icon: "chart-box-outline",
+                  color: "#6366F1",
+                  onPress: () => router.push("/reports"),
+                }
+              : null,
+            role === "owner" || role === "kassier"
+              ? {
+                  title: Translations.uz.cashier.title,
+                  icon: "cash-register",
+                  color: "#10B981",
+                  onPress: () => router.push("/cashier"),
+                }
+              : null,
+          ]
+            .filter(Boolean)
+            .map((action: any, idx) => (
+              <QuickAction
+                key={idx}
+                title={action.title}
+                icon={action.icon}
+                color={action.color}
+                onPress={action.onPress}
+              />
+            ))}
         </View>
 
         <View style={styles.bottomSpace} />
@@ -361,38 +447,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     textAlign: "center",
   },
-  chartContainer: {
-    padding: 20,
-    borderRadius: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  chartActions: {
-    flexDirection: "row",
-    gap: 6,
-    backgroundColor: "rgba(0,0,0,0.03)",
-    padding: 4,
-    borderRadius: 12,
-  },
-  periodTab: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  periodTabText: { fontSize: 11, fontWeight: "bold" },
-  legendRow: { flexDirection: "row", gap: 15, marginBottom: 15 },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 11, fontWeight: "600" },
-  chartBody: {
-    flexDirection: "row",
-    height: 160,
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    paddingTop: 10,
-  },
-  barContainer: { alignItems: "center", gap: 8, flex: 1 },
-  barStack: { flexDirection: "row", alignItems: "flex-end" },
-  barFill: { width: 8, borderTopLeftRadius: 3, borderTopRightRadius: 3 },
-  barLabel: { fontSize: 10, fontWeight: "600" },
-  bottomSpace: { height: 100 },
+  bottomSpace: { height: 40 }, // Reduced bottom space
 });
