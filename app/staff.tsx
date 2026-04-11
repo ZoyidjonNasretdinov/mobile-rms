@@ -17,11 +17,12 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
+import { CONFIG } from "@/constants/config";
 
 import { Translations } from "@/constants/translations";
 
 const t = Translations.uz.staff;
-const API_BASE_URL = "http://192.168.43.160:3000";
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 export default function StaffManagementScreen() {
   const router = useRouter();

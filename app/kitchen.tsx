@@ -17,6 +17,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter } from "expo-router";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
+import { CONFIG } from "@/constants/config";
 import { socketService } from "@/utils/socket";
 import * as Haptics from "expo-haptics";
 import {
@@ -33,8 +34,8 @@ import Animated, {
 } from "react-native-reanimated";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
-const API_BASE_URL = "http://192.168.43.160:3000";
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.2; // Lowered from 0.3 for easier trigger
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 type KitchenTab = "Pending" | "Cooking" | "Ready" | "Inventory";
 
@@ -75,14 +76,15 @@ const SwipeableItem = ({
   const canSwipeLeft = status !== "Pending";
 
   const gesture = Gesture.Pan()
-    .activeOffsetX([-10, 10]) // Fix: Don't let scroll steal the gesture easily
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-15, 15])
     .onUpdate((event) => {
       let x = event.translationX;
       if (!canSwipeRight && x > 0) x = x * 0.2;
       if (!canSwipeLeft && x < 0) x = x * 0.2;
       translateX.value = x;
     })
-    .onEnd(() => {
+    .onEnd((event) => {
       if (canSwipeRight && translateX.value > SWIPE_THRESHOLD) {
         runOnJS(safeHaptics)(Haptics.NotificationFeedbackType.Success);
         runOnJS(onSwipeRight)(item._id, matchingItems);
@@ -101,11 +103,25 @@ const SwipeableItem = ({
   }));
 
   const rIconLeftStyle = useAnimatedStyle(() => ({
-    opacity: canSwipeRight && translateX.value > 20 ? 1 : 0,
+    opacity:
+      canSwipeRight && translateX.value > 5
+        ? Math.min(translateX.value / 40, 1)
+        : 0,
+    transform: [
+      { scale: withSpring(translateX.value > 30 ? 1.1 : 0.8, { damping: 10 }) },
+    ],
   }));
 
   const rIconRightStyle = useAnimatedStyle(() => ({
-    opacity: canSwipeLeft && translateX.value < -20 ? 1 : 0,
+    opacity:
+      canSwipeLeft && translateX.value < -5
+        ? Math.min(Math.abs(translateX.value) / 40, 1)
+        : 0,
+    transform: [
+      {
+        scale: withSpring(translateX.value < -30 ? 1.1 : 0.8, { damping: 10 }),
+      },
+    ],
   }));
 
   const config = (() => {
@@ -129,7 +145,7 @@ const SwipeableItem = ({
         style={[
           styles.swipeBack,
           rIconLeftStyle,
-          { backgroundColor: colors.success + "20" },
+          { backgroundColor: colors.success + "25" },
         ]}
       >
         <MaterialCommunityIcons
@@ -143,7 +159,7 @@ const SwipeableItem = ({
           styles.swipeBack,
           styles.swipeBackRight,
           rIconRightStyle,
-          { backgroundColor: colors.danger + "20" },
+          { backgroundColor: colors.danger + "25" },
         ]}
       >
         <MaterialCommunityIcons
@@ -368,9 +384,14 @@ export default function KitchenScreen() {
         const filtered = allOrders
           .filter((o: any) => o.status !== "Paid")
           .map((order: any) => {
-            const myItems = (order.items || []).filter(
-              (item: any) => item.department === myDept,
-            );
+            // Keep original index to ensure backend updates reach the correct item
+            const myItems = (order.items || [])
+              .map((item: any, originalIndex: number) => ({
+                ...item,
+                originalIndex,
+              }))
+              .filter((item: any) => item.department === myDept);
+
             return myItems.length > 0 ? { ...order, items: myItems } : null;
           })
           .filter(Boolean);
@@ -605,7 +626,10 @@ export default function KitchenScreen() {
     const grouped: any[] = [];
     orders.forEach((order) => {
       const matchingItems = (order.items || [])
-        .map((item: any, index: number) => ({ ...item, index }))
+        .map((item: any) => ({
+          ...item,
+          index: item.originalIndex ?? 0, // Fallback if somehow missing
+        }))
         .filter((item: any) => item.status === activeTab);
 
       if (matchingItems.length > 0) {
@@ -759,16 +783,33 @@ export default function KitchenScreen() {
                       { backgroundColor: colors.card },
                     ]}
                   >
-                    <View style={styles.transferInfo}>
+                    <View style={{ flex: 1 }}>
                       <Text
                         style={[styles.transferName, { color: colors.text }]}
                       >
-                        {t.productId?.name}
+                        {t.productId?.name || "Noma'lum mahsulot"}
                       </Text>
+                      <Text style={{ fontSize: 12, color: colors.secondary }}>
+                        Masalliq kelgan vaqti:{" "}
+                        {new Date(t.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.transferQtyBadge,
+                        { backgroundColor: colors.primary + "15" },
+                      ]}
+                    >
                       <Text
-                        style={[styles.transferQty, { color: colors.primary }]}
+                        style={[
+                          styles.transferQty,
+                          { color: colors.primary, fontWeight: "bold" },
+                        ]}
                       >
-                        {t.quantity} {t.productId?.unit}
+                        {t.quantity} {t.productId?.unit || ""}
                       </Text>
                     </View>
                     <View style={styles.transferActions}>
@@ -1088,6 +1129,12 @@ const styles = StyleSheet.create({
   },
   transferInfo: { flex: 1, gap: 4 },
   transferName: { fontSize: 16, fontWeight: "bold" },
+  transferQtyBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
   transferQty: { fontSize: 14, fontWeight: "600" },
   transferActions: { flexDirection: "row", gap: 8 },
   actionBtn: {

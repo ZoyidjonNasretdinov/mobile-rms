@@ -22,9 +22,10 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Translations } from "@/constants/translations";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
+import { CONFIG } from "@/constants/config";
 
 const t = Translations.uz.inventory;
-const API_BASE_URL = "http://192.168.43.160:3000";
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 export default function CreateInventoryScreen() {
   const router = useRouter();

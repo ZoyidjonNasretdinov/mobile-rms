@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { Storage } from "@/utils/storage";
+import { CONFIG } from "@/constants/config";
 import axios from "axios";
 import { StatusBar } from "expo-status-bar";
 import { Colors } from "../constants/theme";
@@ -25,25 +26,56 @@ import { Translations } from "../constants/translations";
 const t = Translations.uz.auth;
 const tc = Translations.uz.common;
 
-const API_URL = "http://192.168.43.160:3000/auth/login";
+const API_URL = `${CONFIG.API_BASE_URL}/auth/login`;
 
 export default function LoginScreen() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isPhoneFocused, setIsPhoneFocused] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [localError, setLocalError] = useState("");
   const router = useRouter();
 
+  const formatPhone = (text: string) => {
+    // Keep only digits
+    const cleaned = text.replace(/\D/g, "");
+
+    // Start with 998 if empty or not starting with it
+    let result = cleaned;
+    if (result.length > 0 && !result.startsWith("998")) {
+      result = "998" + result;
+    }
+    if (result.length === 0) return "";
+
+    let formatted = "+";
+    if (result.length > 0) formatted += result.substring(0, 3);
+    if (result.length > 3) formatted += " " + result.substring(3, 5);
+    if (result.length > 5) formatted += " " + result.substring(5, 8);
+    if (result.length > 8) formatted += " " + result.substring(8, 10);
+    if (result.length > 10) formatted += " " + result.substring(10, 12);
+
+    return formatted.substring(0, 17);
+  };
+
+  const handlePhoneChange = (text: string) => {
+    const formatted = formatPhone(text);
+    setPhone(formatted);
+  };
+
   const handleLogin = async () => {
+    setLocalError("");
     if (!phone || !password) {
-      Alert.alert(t.error, t.errorFillFields);
+      setLocalError(t.errorFillFields);
       return;
     }
 
     setLoading(true);
     try {
-      // Normalize phone: strip "+", spaces, and other non-digits
-      const normalizedPhone = phone.replace(/\D/g, "");
+      // Normalize phone: strip spaces and other non-digits, then add "+"
+      const cleaned = phone.replace(/\D/g, "");
+      const normalizedPhone = "+" + cleaned;
 
       const response = await axios.post(API_URL, {
         phone: normalizedPhone,
@@ -66,6 +98,8 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || t.errorLogin;
+      setLocalError(errorMsg);
+      // Fallback alert
       Alert.alert(t.error, errorMsg);
     } finally {
       setLoading(false);
@@ -79,7 +113,10 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.flex}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.headerContainer}>
             <View style={styles.logoIconContainer}>
               <MaterialCommunityIcons name="chef-hat" size={40} color="white" />
@@ -94,11 +131,20 @@ export default function LoginScreen() {
 
             <View style={styles.form}>
               <Text style={styles.label}>{t.phoneLabel}</Text>
-              <View style={styles.inputContainer}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  isPhoneFocused && styles.inputContainerFocused,
+                ]}
+              >
                 <MaterialCommunityIcons
                   name="phone-outline"
                   size={20}
-                  color={Colors.light.secondary}
+                  color={
+                    isPhoneFocused
+                      ? Colors.light.primary
+                      : Colors.light.secondary
+                  }
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -107,17 +153,29 @@ export default function LoginScreen() {
                   placeholderTextColor={Colors.light.secondary}
                   keyboardType="phone-pad"
                   value={phone}
-                  onChangeText={setPhone}
+                  onChangeText={handlePhoneChange}
+                  onFocus={() => setIsPhoneFocused(true)}
+                  onBlur={() => setIsPhoneFocused(false)}
                   autoCapitalize="none"
+                  maxLength={17}
                 />
               </View>
 
               <Text style={styles.label}>{t.passwordLabel}</Text>
-              <View style={styles.inputContainer}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  isPasswordFocused && styles.inputContainerFocused,
+                ]}
+              >
                 <MaterialCommunityIcons
                   name="lock-outline"
                   size={20}
-                  color={Colors.light.secondary}
+                  color={
+                    isPasswordFocused
+                      ? Colors.light.primary
+                      : Colors.light.secondary
+                  }
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -127,6 +185,8 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
+                  onFocus={() => setIsPasswordFocused(true)}
+                  onBlur={() => setIsPasswordFocused(false)}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
@@ -139,6 +199,17 @@ export default function LoginScreen() {
                   />
                 </TouchableOpacity>
               </View>
+
+              {localError ? (
+                <View style={styles.errorContainer}>
+                  <MaterialCommunityIcons
+                    name="alert-circle-outline"
+                    size={16}
+                    color="#FF4D4F"
+                  />
+                  <Text style={styles.errorText}>{localError}</Text>
+                </View>
+              ) : null}
 
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
@@ -157,12 +228,12 @@ export default function LoginScreen() {
           <View style={styles.footer}>
             <Text style={styles.footerText}>{t.demoAccounts}</Text>
             <View style={styles.demoRow}>
-              <Text style={styles.demoType}>{t.owner}</Text>
-              <Text style={styles.demoEmail}>owner@restaurant.com</Text>
+              <Text style={styles.demoType}>{t.owner}:</Text>
+              <Text style={styles.demoEmail}>+998700134501 / 12345678</Text>
             </View>
             <View style={styles.demoRow}>
-              <Text style={styles.demoType}>{t.waiter}</Text>
-              <Text style={styles.demoEmail}>waiter@restaurant.com</Text>
+              <Text style={styles.demoType}>{t.waiter}:</Text>
+              <Text style={styles.demoEmail}>+998921234573 / password123</Text>
             </View>
           </View>
         </ScrollView>
@@ -267,8 +338,26 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.input,
     borderRadius: 16,
     paddingHorizontal: 16,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Colors.light.border,
+  },
+  inputContainerFocused: {
+    borderColor: Colors.light.primary,
+    backgroundColor: "white",
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.light.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: `0px 4px 12px ${Colors.light.primary}1A`,
+      },
+    }),
   },
   inputIcon: {
     marginRight: 12,
@@ -335,5 +424,21 @@ const styles = StyleSheet.create({
   demoEmail: {
     fontSize: 13,
     color: Colors.light.secondary,
+  },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF1F0",
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#FFA39E",
+  },
+  errorText: {
+    color: "#FF4D4F",
+    fontSize: 14,
+    fontWeight: "500",
+    flex: 1,
   },
 });

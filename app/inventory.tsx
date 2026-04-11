@@ -21,11 +21,12 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Translations } from "@/constants/translations";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
+import { CONFIG } from "@/constants/config";
 import { io } from "socket.io-client";
 
 const t = Translations.uz.inventory;
 const common = Translations.uz.common;
-const API_BASE_URL = "http://192.168.43.160:3000";
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 export default function InventoryStatusScreen() {
   const router = useRouter();
@@ -89,20 +90,24 @@ export default function InventoryStatusScreen() {
   );
 
   useEffect(() => {
-    const socket = io(API_BASE_URL);
-    socket.on("stockUpdated", (data) => {
-      setItems((prev) =>
-        prev.map((item) =>
-          item._id === data.productId
-            ? { ...item, currentStock: data.newStock }
-            : item,
-        ),
-      );
+    const socket = io(API_BASE_URL, { transports: ["websocket"] });
+    socket.on("stockUpdated", () => {
+      fetchData();
+    });
+    socket.on("staffStockUpdated", () => {
+      fetchData();
     });
     return () => {
       socket.disconnect();
     };
   }, []);
+
+  const getStockColor = (qty: number) => {
+    if (qty <= 0) return colors.danger;
+    if (qty < 2) return "#FF4D4F"; // Red
+    if (qty < 5) return "#FAAD14"; // Yellow/Orange
+    return colors.primary;
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -126,6 +131,8 @@ export default function InventoryStatusScreen() {
     }
   };
 
+  const [distributing, setDistributing] = useState(false);
+
   const handleDistribute = async () => {
     const qty = parseFloat(distQuantity);
     if (!selectedItem || !qty || isNaN(qty)) {
@@ -133,6 +140,7 @@ export default function InventoryStatusScreen() {
       return;
     }
 
+    setDistributing(true);
     try {
       const token = await Storage.getItem("access_token");
       await axios.post(
@@ -150,6 +158,8 @@ export default function InventoryStatusScreen() {
       Alert.alert("Muvaffaqiyat", "Mahsulot tarqatildi");
     } catch (error: any) {
       Alert.alert("Xato", error.response?.data?.message || "Xatolik yuz berdi");
+    } finally {
+      setDistributing(false);
     }
   };
 
@@ -441,33 +451,80 @@ export default function InventoryStatusScreen() {
                   key={s._id}
                   style={[styles.statCard, { backgroundColor: colors.card }]}
                 >
-                  <Text style={[styles.statDept, { color: colors.accent }]}>
-                    {s._id.toUpperCase()}
-                  </Text>
-                  <View style={styles.miniStockList}>
-                    {deptStock.slice(0, 3).map((st, idx) => (
+                  <View style={styles.statHeader}>
+                    <Text style={[styles.statDept, { color: colors.accent }]}>
+                      {s._id.toUpperCase()}
+                    </Text>
+                    <View
+                      style={[
+                        styles.itemCountBadge,
+                        { backgroundColor: colors.accent + "15" },
+                      ]}
+                    >
                       <Text
-                        key={idx}
-                        style={[styles.miniStockText, { color: colors.text }]}
+                        style={[styles.itemCountText, { color: colors.accent }]}
                       >
-                        • {st.productId?.name}: {st.quantity}
+                        {deptStock.length} ta tur
                       </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.miniStockList}>
+                    {deptStock.slice(0, 8).map((st, idx) => (
+                      <View key={idx} style={styles.miniStockRow}>
+                        <Text
+                          style={[styles.miniStockText, { color: colors.text }]}
+                          numberOfLines={1}
+                        >
+                          • {st.productId?.name || "Noma'lum"}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.miniStockQty,
+                            { color: getStockColor(st.quantity) },
+                          ]}
+                        >
+                          {st.quantity} {st.productId?.unit || ""}
+                        </Text>
+                      </View>
                     ))}
-                    {deptStock.length > 3 && (
+                    {deptStock.length > 8 && (
                       <Text
                         style={[
                           styles.miniStockText,
-                          { color: colors.secondary, fontSize: 10 },
+                          {
+                            color: colors.secondary,
+                            fontSize: 10,
+                            marginTop: 4,
+                          },
                         ]}
                       >
-                        +{deptStock.length - 3} yana...
+                        +{deptStock.length - 8} yana...
+                      </Text>
+                    )}
+                    {deptStock.length === 0 && (
+                      <Text
+                        style={[
+                          styles.miniStockText,
+                          { color: colors.secondary, fontStyle: "italic" },
+                        ]}
+                      >
+                        Hozircha bo'sh
                       </Text>
                     )}
                   </View>
+
                   <View style={styles.statDivider} />
-                  <Text style={[styles.statVal, { color: colors.primary }]}>
-                    Jami: {s.totalQuantity}
-                  </Text>
+                  <View style={styles.statFooter}>
+                    <Text
+                      style={[
+                        styles.statVal,
+                        { color: getStockColor(s.totalQuantity) },
+                      ]}
+                    >
+                      Jami hajm: {s.totalQuantity.toLocaleString()}
+                    </Text>
+                  </View>
                 </View>
               );
             })}
@@ -598,10 +655,23 @@ export default function InventoryStatusScreen() {
                 <Text>Bekor qilish</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: colors.primary }]}
+                style={[
+                  styles.modalBtn,
+                  {
+                    backgroundColor: colors.primary,
+                    opacity: distributing ? 0.7 : 1,
+                  },
+                ]}
                 onPress={handleDistribute}
+                disabled={distributing}
               >
-                <Text style={{ color: "white" }}>Tarqatish</Text>
+                {distributing ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={{ color: "white", fontWeight: "bold" }}>
+                    Tarqatish
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -830,27 +900,56 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10 },
   statsScroll: { gap: 10 },
   statCard: {
-    padding: 15,
-    borderRadius: 16,
-    marginRight: 10,
-    minWidth: 120,
+    padding: 16,
+    borderRadius: 20,
+    marginRight: 12,
+    width: 200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  statHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    width: "100%",
+    marginBottom: 12,
+  },
+  itemCountBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  itemCountText: {
+    fontSize: 10,
+    fontWeight: "bold",
   },
   statDept: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "bold",
-    marginBottom: 8,
     textTransform: "uppercase",
   },
-  statVal: { fontSize: 14, fontWeight: "bold", marginTop: 8 },
-  miniStockList: { width: "100%", gap: 2 },
-  miniStockText: { fontSize: 11, fontWeight: "500" },
+  miniStockList: { width: "100%", gap: 4, minHeight: 80 },
+  miniStockRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  miniStockText: { fontSize: 12, fontWeight: "500", flex: 1 },
+  miniStockQty: { fontSize: 11, fontWeight: "600" },
   statDivider: {
     height: 1,
     width: "100%",
     backgroundColor: "rgba(0,0,0,0.05)",
-    marginVertical: 4,
+    marginVertical: 10,
   },
+  statFooter: {
+    width: "100%",
+    alignItems: "flex-end",
+  },
+  statVal: { fontSize: 13, fontWeight: "bold" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

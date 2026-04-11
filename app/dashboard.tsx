@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Text,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -16,6 +17,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import axios from "axios";
 import { socketService } from "@/utils/socket";
+import { CONFIG } from "@/constants/config";
 
 import { Translations } from "@/constants/translations";
 
@@ -33,6 +35,8 @@ export default function DashboardScreen() {
   const [revenue, setRevenue] = useState(0);
   const [orderCount, setOrderCount] = useState(0);
   const [role, setRole] = useState("");
+  const [activeShift, setActiveShift] = useState<any>(null);
+  const [isShiftActive, setIsShiftActive] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -54,7 +58,7 @@ export default function DashboardScreen() {
       // Load staff stats
       try {
         const token = await Storage.getItem("access_token");
-        const response = await axios.get("http://192.168.43.160:3000/users", {
+        const response = await axios.get(`${CONFIG.API_BASE_URL}/users`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const staff = response.data;
@@ -78,7 +82,7 @@ export default function DashboardScreen() {
         ).toISOString();
 
         const statsRes = await axios.get(
-          `http://192.168.43.160:3000/orders/stats?startDate=${startOfDay}&endDate=${endOfDay}`,
+          `${CONFIG.API_BASE_URL}/orders/stats?startDate=${startOfDay}&endDate=${endOfDay}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -194,9 +198,6 @@ export default function DashboardScreen() {
         <View>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
             {t.title}
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: colors.secondary }]}>
-            {t.welcome.replace("{name}", userName)}
           </Text>
         </View>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -447,5 +448,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     textAlign: "center",
   },
-  bottomSpace: { height: 40 }, // Reduced bottom space
+  bottomSpace: { height: 40 },
+  shiftStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  shiftActions: {
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  shiftBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 15,
+    gap: 8,
+  },
+  shiftBtnText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
 });

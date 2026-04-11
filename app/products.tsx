@@ -21,12 +21,13 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Translations } from "@/constants/translations";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
+import { CONFIG } from "@/constants/config";
 import * as Haptics from "expo-haptics";
 import { socketService } from "@/utils/socket";
 
 const t = Translations.uz.products;
 const common = Translations.uz.common;
-const API_BASE_URL = "http://192.168.43.160:3000";
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 const getCategoryIcon = (category?: string) => {
   const name = category?.toLowerCase().trim() || "";

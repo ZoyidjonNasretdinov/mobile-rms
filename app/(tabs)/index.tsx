@@ -15,6 +15,7 @@ import { Colors } from "@/constants/theme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import axios from "axios";
+import { CONFIG } from "@/constants/config";
 
 import { Translations } from "@/constants/translations";
 
@@ -42,7 +43,7 @@ export default function DashboardScreen() {
       // Load staff stats
       try {
         const token = await Storage.getItem("access_token");
-        const response = await axios.get("http://192.168.43.160:3000/users", {
+        const response = await axios.get(`${CONFIG.API_BASE_URL}/users`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const staff = response.data;

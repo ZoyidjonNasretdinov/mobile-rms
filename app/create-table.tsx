@@ -16,8 +16,9 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
+import { CONFIG } from "@/constants/config";
 
-const API_BASE_URL = "http://192.168.43.160:3000";
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 export default function CreateTableScreen() {
   const router = useRouter();

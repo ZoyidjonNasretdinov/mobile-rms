@@ -5,14 +5,19 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { Translations } from "@/constants/translations";
+import axios from "axios";
+import { CONFIG } from "@/constants/config";
 
+const API_BASE_URL = CONFIG.API_BASE_URL;
 const t = Translations.uz.partners;
 const c = Translations.uz.common;
 
@@ -20,6 +25,31 @@ export default function PartnersScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+
+  const [partners, setPartners] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const token = await SecureStore.getItemAsync("userToken");
+      const res = await axios.get(`${API_BASE_URL}/partners`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPartners(res.data);
+      setLoading(false);
+      setRefreshing(false);
+    } catch (error) {
+      console.error("Fetch partners error:", error);
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchData();
+  }, []);
 
   const PartnerCard = ({ name, contribution, share, trend }: any) => (
     <View style={[styles.partnerCard, { backgroundColor: colors.card }]}>
@@ -164,18 +194,32 @@ export default function PartnersScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           {t.contribution}
         </Text>
-        <PartnerCard
-          name={t.names.partner1}
-          contribution="25,000,000"
-          share="50"
-          trend="15"
-        />
-        <PartnerCard
-          name={t.names.partner2}
-          contribution="20,000,000"
-          share="50"
-          trend="8"
-        />
+
+        {loading && partners.length === 0 ? (
+          <ActivityIndicator size="large" color={colors.primary} />
+        ) : (
+          partners.map((partner) => (
+            <PartnerCard
+              key={partner._id}
+              name={partner.name}
+              contribution={partner.totalContribution.toLocaleString()}
+              share={partner.share}
+              trend="0"
+            />
+          ))
+        )}
+
+        {partners.length === 0 && !loading && (
+          <Text
+            style={{
+              textAlign: "center",
+              color: colors.secondary,
+              marginTop: 20,
+            }}
+          >
+            Hozircha sheriklar yo'q
+          </Text>
+        )}
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           {t.recentActivity}

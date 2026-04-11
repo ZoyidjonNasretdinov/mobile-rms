@@ -1,14 +1,19 @@
 import { io, Socket } from "socket.io-client";
+import { CONFIG } from "@/constants/config";
 
-const SOCKET_URL = "http://192.168.43.160:3000";
+const SOCKET_URL = CONFIG.API_BASE_URL;
 
 class SocketService {
   private socket: Socket | null = null;
 
   connect() {
     if (!this.socket) {
-      this.socket = io(SOCKET_URL);
-      console.log("Connecting to socket...");
+      this.socket = io(SOCKET_URL, {
+        transports: ["websocket"], // High-speed direct websocket transport
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+      });
+      console.log("Connecting to high-speed socket...");
     }
     return this.socket;
   }

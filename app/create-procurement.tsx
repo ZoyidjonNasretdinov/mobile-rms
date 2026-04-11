@@ -24,8 +24,9 @@ import { useRouter } from "expo-router";
 import { Translations } from "@/constants/translations";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
+import { CONFIG } from "@/constants/config";
 
-const API_BASE_URL = "http://192.168.43.160:3000";
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 const getCategoryIcon = (category?: string) => {
   const name = category?.toLowerCase().trim() || "";
@@ -164,6 +165,24 @@ export default function CreateProcurementScreen() {
     setShowProductModal(false);
   };
 
+  useEffect(() => {
+    // Auto-match name to product
+    if (form.item && !form.itemId) {
+      const match = items.find(
+        (i) => i.name.toLowerCase() === form.item.toLowerCase(),
+      );
+      if (match) {
+        setForm((prev) => ({
+          ...prev,
+          itemId: match._id,
+          unit: match.unit,
+          category: match.category,
+        }));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    }
+  }, [form.item, items]);
+
   const filteredItems = items.filter((i) =>
     i.name.toLowerCase().includes(productSearch.toLowerCase()),
   );
@@ -198,44 +217,57 @@ export default function CreateProcurementScreen() {
           <View style={styles.formSection}>
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.secondary }]}>
-                Mahsulot
+                Mahsulot nomi
               </Text>
-              <TouchableOpacity
-                onPress={() => setShowProductModal(true)}
+              <View
                 style={[
-                  styles.productSelector,
+                  styles.productSelectorGroup,
                   {
                     backgroundColor: colors.card,
                     borderColor: form.itemId ? colors.primary : colors.border,
                   },
                 ]}
               >
-                <View style={styles.selectorInfo}>
+                <TextInput
+                  style={[styles.nameInput, { color: colors.text }]}
+                  placeholder="Mahsulot nomini kiriting..."
+                  placeholderTextColor={colors.secondary}
+                  value={form.item}
+                  onChangeText={(val) => {
+                    // Reset itemId if name changes and we aren't picking from list
+                    setForm({ ...form, item: val, itemId: "" });
+                  }}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowProductModal(true)}
+                  style={[
+                    styles.listBtn,
+                    { backgroundColor: colors.accent + "15" },
+                  ]}
+                >
                   <MaterialCommunityIcons
-                    name={
-                      (categories.find((c) => c.name === form.category)?.icon ||
-                        (form.item
-                          ? getCategoryIcon(form.category)
-                          : "package-variant-closed")) as any
-                    }
-                    size={24}
-                    color={form.itemId ? colors.primary : colors.secondary}
+                    name="format-list-bulleted"
+                    size={20}
+                    color={colors.accent}
                   />
-                  <Text
-                    style={[
-                      styles.selectorText,
-                      { color: form.itemId ? colors.text : colors.secondary },
-                    ]}
-                  >
-                    {form.item || "Ombordan tanlang..."}
+                </TouchableOpacity>
+              </View>
+              {form.itemId ? (
+                <View style={styles.linkedBadge}>
+                  <MaterialCommunityIcons
+                    name="check-circle"
+                    size={14}
+                    color={colors.success}
+                  />
+                  <Text style={[styles.linkedText, { color: colors.success }]}>
+                    Omborga bog'langan
                   </Text>
                 </View>
-                <MaterialCommunityIcons
-                  name="chevron-down"
-                  size={20}
-                  color={colors.secondary}
-                />
-              </TouchableOpacity>
+              ) : (
+                <Text style={[styles.hintText, { color: colors.secondary }]}>
+                  Ombordan tanlang yoki nomini kiriting
+                </Text>
+              )}
             </View>
 
             <View style={styles.row}>
@@ -290,6 +322,48 @@ export default function CreateProcurementScreen() {
                     UZS
                   </Text>
                 </View>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.secondary }]}>
+                Kategoriya
+              </Text>
+              <View style={styles.chipGrid}>
+                {categories.map((c) => (
+                  <TouchableOpacity
+                    key={c._id}
+                    onPress={() => {
+                      setForm({ ...form, category: c.name });
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    style={[
+                      styles.catChip,
+                      {
+                        backgroundColor:
+                          form.category === c.name
+                            ? colors.primary
+                            : colors.card,
+                      },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={getCategoryIcon(c.name) as any}
+                      size={16}
+                      color={form.category === c.name ? "white" : colors.text}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text
+                      style={{
+                        color: form.category === c.name ? "white" : colors.text,
+                        fontSize: 12,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {c.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
 
@@ -514,15 +588,43 @@ const styles = StyleSheet.create({
   },
   input: { flex: 1, fontSize: 16, fontWeight: "500" },
   unitBadge: { fontSize: 14, fontWeight: "700", marginLeft: 8 },
-  productSelector: {
+  productSelectorGroup: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     height: 64,
     borderRadius: 18,
     borderWidth: 1.5,
     paddingHorizontal: 16,
-    borderStyle: "dashed",
+    gap: 12,
+  },
+  nameInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  listBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  linkedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+    paddingLeft: 4,
+  },
+  linkedText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  hintText: {
+    fontSize: 11,
+    marginTop: 6,
+    paddingLeft: 4,
+    fontStyle: "italic",
   },
   selectorInfo: { flexDirection: "row", alignItems: "center", gap: 12 },
   selectorText: { fontSize: 16, fontWeight: "600" },
@@ -536,7 +638,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sourceChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
-  catChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  catChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+  },
   footer: {
     padding: 24,
     borderTopWidth: 1,

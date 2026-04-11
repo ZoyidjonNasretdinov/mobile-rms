@@ -25,8 +25,9 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Storage } from "@/utils/storage";
 import { Translations } from "@/constants/translations";
 import axios from "axios";
+import { CONFIG } from "@/constants/config";
 
-const API_BASE_URL = "http://192.168.43.160:3000";
+const API_BASE_URL = CONFIG.API_BASE_URL;
 const t = Translations.uz.menu;
 const common = Translations.uz.common;
 

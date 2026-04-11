@@ -17,8 +17,9 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Storage } from "@/utils/storage";
 import { Translations } from "@/constants/translations";
 import axios from "axios";
+import { CONFIG } from "@/constants/config";
 
-const API_BASE_URL = "http://192.168.43.160:3000";
+const API_BASE_URL = CONFIG.API_BASE_URL;
 
 export default function CreateOrderScreen() {
   const router = useRouter();
@@ -165,9 +166,12 @@ export default function CreateOrderScreen() {
       Alert.alert("Muvaffaqiyatli", "Buyurtma saqlandi", [
         { text: "OK", onPress: () => router.back() },
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Save order error:", error);
-      Alert.alert("Xatolik", "Buyurtmani saqlashda xatolik yuz berdi");
+      const msg =
+        error.response?.data?.message ||
+        "Buyurtmani saqlashda xatolik yuz berdi";
+      Alert.alert("Xatolik", msg);
     } finally {
       setSaving(false);
     }

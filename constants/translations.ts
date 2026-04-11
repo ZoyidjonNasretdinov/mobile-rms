@@ -32,6 +32,11 @@ export const Translations = {
       weeklyRevenue: "Haftalik Tushum",
       thisWeek: "Shu hafta",
       now: "Hozir",
+      startDay: "Kunni Boshlash",
+      endDay: "Kunni Yakunlash",
+      shiftStatus: "Ish kuni holati",
+      active: "OCHIQ",
+      closed: "Yopiq",
     },
     tabs: {
       home: "Asosiy",
