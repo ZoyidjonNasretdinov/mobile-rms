@@ -1,7 +1,7 @@
 export const Translations = {
   uz: {
     auth: {
-      title: "Restoran Boshqaruvchisi",
+      title: "RMS Boshqaruvchisi",
       subtitle: "Ichki Operatsiyalar Tizimi",
       loginTitle: "Xodimlar Kirishi",
       loginSubtitle: "Hisoblar faqat restoran admini tomonidan yaratiladi",
@@ -29,6 +29,7 @@ export const Translations = {
       inventory: "Ombor",
       expenses: "Xarajatlar",
       reports: "Hisobotlar",
+      tables: "Stollar",
       weeklyRevenue: "Haftalik Tushum",
       thisWeek: "Shu hafta",
       now: "Hozir",

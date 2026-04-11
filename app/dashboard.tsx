@@ -216,44 +216,7 @@ export default function DashboardScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           {t.performance}
         </Text>
-        <View style={styles.perfGrid}>
-          <PerformanceCard
-            title={t.revenue}
-            value={`${revenue.toLocaleString()} ${Translations.uz.common.currency}`}
-            change="+12%"
-            icon="currency-usd"
-            iconColor="#10B981"
-            bgColor="#10B98115"
-            onPress={() => router.push("/cashier?tab=history")}
-          />
-          <PerformanceCard
-            title={t.orders}
-            value={orderCount.toString()}
-            change="+8%"
-            icon="cart-outline"
-            iconColor="#3B82F6"
-            bgColor="#3B82F615"
-            onPress={() => router.push("/orders")}
-          />
-          <PerformanceCard
-            title={t.staffOnDuty}
-            value={`${activeStaffCount.active}/${activeStaffCount.total}`}
-            change={t.now}
-            icon="account-group-outline"
-            iconColor="#8B5CF6"
-            bgColor="#8B5CF615"
-            onPress={() => router.push("/staff")}
-          />
-          <PerformanceCard
-            title={t.stockLevel}
-            value="87"
-            change="-4%"
-            icon="cube-outline"
-            iconColor="#F59E0B"
-            bgColor="#F59E0B15"
-            onPress={() => router.push("/inventory")}
-          />
-        </View>
+        <View style={styles.perfGrid}></View>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           {t.quickActions}
@@ -267,8 +230,8 @@ export default function DashboardScreen() {
               onPress: () => router.push("/staff"),
             },
             {
-              title: "Stollar",
-              icon: "table-chair",
+              title: t.tables,
+              icon: "table-furniture",
               color: "#00AEEF",
               onPress: () => router.push("/tables-admin"),
             },
