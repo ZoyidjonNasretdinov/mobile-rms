@@ -6,6 +6,11 @@ import {
   TouchableOpacity,
   Text,
   Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -38,6 +43,12 @@ export default function DashboardScreen() {
   const [role, setRole] = useState("");
   const [activeShift, setActiveShift] = useState<any>(null);
   const [isShiftActive, setIsShiftActive] = useState(false);
+  const [showShiftModal, setShowShiftModal] = useState(false);
+  const [shiftModalType, setShiftModalType] = useState<"start" | "end">(
+    "start",
+  );
+  const [shiftCash, setShiftCash] = useState("0");
+  const [processingShift, setProcessingShift] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -102,6 +113,14 @@ export default function DashboardScreen() {
           (p: any) => p.currentStock <= (p.minThreshold || 0),
         ).length;
         setStockStats({ low: lowStock, total: products.length });
+
+        // 4. Shift status
+        const shiftRes = await axios.get(
+          `${CONFIG.API_BASE_URL}/shifts/active`,
+          { headers },
+        );
+        setActiveShift(shiftRes.data);
+        setIsShiftActive(!!shiftRes.data);
       } catch (error) {
         console.error("Dashboard fetch error:", error);
       }
@@ -133,6 +152,81 @@ export default function DashboardScreen() {
     await Storage.removeItem("access_token");
     await Storage.removeItem("user");
     router.replace("/login");
+  };
+
+  const handleStartShift = () => {
+    setShiftModalType("start");
+    setShiftCash("0");
+    setShowShiftModal(true);
+  };
+
+  const handleEndShift = () => {
+    setShiftModalType("end");
+    setShiftCash("0");
+    setShowShiftModal(true);
+  };
+
+  const submitShiftAction = async () => {
+    if (processingShift) return;
+    setProcessingShift(true);
+    try {
+      const token = await Storage.getItem("access_token");
+      const staffStr = await Storage.getItem("user");
+      const user = staffStr ? JSON.parse(staffStr) : null;
+      const userId = user?.id || user?._id || "";
+
+      if (!userId) {
+        Alert.alert("Xato", "User ID topilmadi. Qaytadan login qiling.");
+        setProcessingShift(false);
+        return;
+      }
+
+      const endpoint =
+        shiftModalType === "start" ? "/shifts/start" : "/shifts/end";
+
+      const cashValue = parseFloat(shiftCash.replace(/[^0-9.]/g, "") || "0");
+
+      const body =
+        shiftModalType === "start"
+          ? { openedBy: userId, startCash: cashValue }
+          : { closedBy: userId, endCash: cashValue };
+
+      const response = await axios.post(
+        `${CONFIG.API_BASE_URL}${endpoint}`,
+        body,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      setShowShiftModal(false);
+
+      Alert.alert(
+        "Muvaffaqiyatli",
+        shiftModalType === "start"
+          ? "Ish kuni boshlandi"
+          : "Ish kuni yakunlandi",
+      );
+
+      // Refresh state
+      const refreshedShift = await axios.get(
+        `${CONFIG.API_BASE_URL}/shifts/active`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setActiveShift(refreshedShift.data);
+      setIsShiftActive(!!refreshedShift.data);
+    } catch (error: any) {
+      console.error(
+        "[ShiftAction] Error:",
+        error.response?.data || error.message,
+      );
+      Alert.alert(
+        "Xato",
+        error.response?.data?.message || "Amalni bajarib bo'lmadi",
+      );
+    } finally {
+      setProcessingShift(false);
+    }
   };
 
   const PerformanceCard = ({
@@ -238,6 +332,48 @@ export default function DashboardScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           {t.performance}
         </Text>
+
+        <View style={styles.shiftActions}>
+          <TouchableOpacity
+            style={[
+              styles.shiftBtn,
+              {
+                backgroundColor: isShiftActive ? colors.danger : colors.success,
+              },
+            ]}
+            onPress={isShiftActive ? handleEndShift : handleStartShift}
+          >
+            <MaterialCommunityIcons
+              name={isShiftActive ? "clock-end" : "clock-start"}
+              size={24}
+              color="white"
+            />
+            <Text style={styles.shiftBtnText}>
+              {isShiftActive ? t.endDay : t.startDay}
+            </Text>
+          </TouchableOpacity>
+          <View style={styles.shiftStatusRow}>
+            <View
+              style={[
+                styles.statusDot,
+                {
+                  backgroundColor: isShiftActive
+                    ? colors.success
+                    : colors.danger,
+                },
+              ]}
+            />
+            <Text
+              style={{
+                color: colors.secondary,
+                fontSize: 13,
+                fontWeight: "600",
+              }}
+            >
+              {t.shiftStatus}: {isShiftActive ? t.active : t.closed}
+            </Text>
+          </View>
+        </View>
         <View style={styles.perfGrid}>
           <PerformanceCard
             title={t.revenue}
@@ -354,6 +490,93 @@ export default function DashboardScreen() {
 
         <View style={styles.bottomSpace} />
       </ScrollView>
+
+      {/* Shift Action Modal */}
+      <Modal visible={showShiftModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalContainer}
+          >
+            <View
+              style={[styles.modalContent, { backgroundColor: colors.card }]}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {shiftModalType === "start"
+                    ? "Ish kunini boshlash"
+                    : "Ish kunini yakunlash"}
+                </Text>
+                <TouchableOpacity onPress={() => setShowShiftModal(false)}>
+                  <MaterialCommunityIcons
+                    name="close"
+                    size={24}
+                    color={colors.secondary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.modalLabel, { color: colors.secondary }]}>
+                {shiftModalType === "start"
+                  ? "Kassadagi boshlang'ich naqd pul:"
+                  : "Kassadagi yakuniy naqd pul:"}
+              </Text>
+
+              <View
+                style={[
+                  styles.cashInputContainer,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="cash-multiple"
+                  size={24}
+                  color={colors.primary}
+                />
+                <TextInput
+                  style={[styles.cashInput, { color: colors.text }]}
+                  value={shiftCash}
+                  onChangeText={setShiftCash}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={colors.secondary}
+                  autoFocus
+                />
+                <Text
+                  style={[styles.currencyLabel, { color: colors.secondary }]}
+                >
+                  {Translations.uz.common.currency}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.submitBtn,
+                  {
+                    backgroundColor:
+                      shiftModalType === "start"
+                        ? colors.success
+                        : colors.danger,
+                  },
+                ]}
+                onPress={submitShiftAction}
+                disabled={processingShift}
+              >
+                {processingShift ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.submitBtnText}>
+                    {shiftModalType === "start" ? "Boshlash" : "Yakunlash"}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -502,5 +725,72 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 12,
     backgroundColor: Colors.light.primary + "10",
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContainer: {
+    width: "100%",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "100%",
+    borderRadius: 24,
+    padding: 24,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    marginBottom: 12,
+  },
+  cashInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 60,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  cashInput: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: "bold",
+    marginLeft: 12,
+  },
+  currencyLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  submitBtn: {
+    height: 56,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  submitBtnText: {
+    color: "white",
+    fontSize: 17,
+    fontWeight: "bold",
   },
 });

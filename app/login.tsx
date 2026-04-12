@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -37,6 +37,7 @@ export default function LoginScreen() {
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [localError, setLocalError] = useState("");
   const router = useRouter();
+  const passwordRef = useRef<any>(null);
 
   const formatPhone = (text: string) => {
     // Keep only digits
@@ -60,8 +61,9 @@ export default function LoginScreen() {
   };
 
   const handlePhoneChange = (text: string) => {
-    const formatted = formatPhone(text);
-    setPhone(formatted);
+    // Just keep the text as is or filter non-digits if needed,
+    // but don't force formatting during typing.
+    setPhone(text);
   };
 
   const handleLogin = async () => {
@@ -112,11 +114,12 @@ export default function LoginScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.flex}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
         >
           <View style={styles.headerContainer}>
             <View style={styles.logoIconContainer}>
@@ -135,17 +138,13 @@ export default function LoginScreen() {
               <View
                 style={[
                   styles.inputContainer,
-                  isPhoneFocused && styles.inputContainerFocused,
+                  // Removed conditional focus styling to prevent re-renders
                 ]}
               >
                 <MaterialCommunityIcons
                   name="phone-outline"
                   size={20}
-                  color={
-                    isPhoneFocused
-                      ? Colors.light.primary
-                      : Colors.light.secondary
-                  }
+                  color={Colors.light.secondary}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -158,9 +157,11 @@ export default function LoginScreen() {
                   onFocus={() => setIsPhoneFocused(true)}
                   onBlur={() => setIsPhoneFocused(false)}
                   autoCapitalize="none"
-                  autoComplete="tel"
-                  textContentType="telephoneNumber"
+                  autoComplete="off"
+                  importantForAutofill="no"
+                  textContentType="none"
                   maxLength={17}
+                  returnKeyType="next"
                 />
               </View>
 
@@ -168,17 +169,13 @@ export default function LoginScreen() {
               <View
                 style={[
                   styles.inputContainer,
-                  isPasswordFocused && styles.inputContainerFocused,
+                  // Removed conditional focus styling to prevent re-renders
                 ]}
               >
                 <MaterialCommunityIcons
                   name="lock-outline"
                   size={20}
-                  color={
-                    isPasswordFocused
-                      ? Colors.light.primary
-                      : Colors.light.secondary
-                  }
+                  color={Colors.light.secondary}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -190,8 +187,11 @@ export default function LoginScreen() {
                   onChangeText={setPassword}
                   onFocus={() => setIsPasswordFocused(true)}
                   onBlur={() => setIsPasswordFocused(false)}
-                  autoComplete="password"
-                  textContentType="password"
+                  autoComplete="off"
+                  importantForAutofill="no"
+                  textContentType="none"
+                  ref={passwordRef}
+                  returnKeyType="done"
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
@@ -242,7 +242,6 @@ export default function LoginScreen() {
               </Text>
             </TouchableOpacity>
             <Text style={styles.footerText}>{t.demoAccounts}</Text>
-            
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

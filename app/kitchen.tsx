@@ -20,6 +20,8 @@ import axios from "axios";
 import { CONFIG } from "@/constants/config";
 import { socketService } from "@/utils/socket";
 import * as Haptics from "expo-haptics";
+import * as Speech from "expo-speech";
+import { notificationService } from "@/utils/notifications";
 import {
   GestureHandlerRootView,
   Gesture,
@@ -31,6 +33,8 @@ import Animated, {
   useSharedValue,
   withSpring,
   runOnJS,
+  interpolate,
+  interpolateColor,
 } from "react-native-reanimated";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -98,9 +102,33 @@ const SwipeableItem = ({
       }
     });
 
-  const rStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
+  const rStyle = useAnimatedStyle(() => {
+    // Wave-like effect: rotate and skew based on swipe
+    const rotate = interpolate(
+      translateX.value,
+      [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+      [-2, 0, 2],
+    );
+    const skew = interpolate(
+      translateX.value,
+      [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+      [-1, 0, 1],
+    );
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { rotate: `${rotate}deg` },
+        { skewX: `${skew}deg` },
+      ],
+      // Border color pulse
+      borderColor: interpolateColor(
+        Math.abs(translateX.value),
+        [0, SWIPE_THRESHOLD],
+        ["transparent", colors.primary + "40"],
+      ),
+      borderWidth: 1,
+    };
+  });
 
   const rIconLeftStyle = useAnimatedStyle(() => ({
     opacity:
@@ -108,7 +136,20 @@ const SwipeableItem = ({
         ? Math.min(translateX.value / 40, 1)
         : 0,
     transform: [
-      { scale: withSpring(translateX.value > 30 ? 1.1 : 0.8, { damping: 10 }) },
+      {
+        scale: withSpring(translateX.value > 30 ? 1.2 : 0.8, {
+          damping: 12,
+          stiffness: 90,
+        }),
+      },
+      {
+        translateX: interpolate(
+          translateX.value,
+          [0, SWIPE_THRESHOLD],
+          [-20, 0],
+          "clamp",
+        ),
+      },
     ],
   }));
 
@@ -119,7 +160,18 @@ const SwipeableItem = ({
         : 0,
     transform: [
       {
-        scale: withSpring(translateX.value < -30 ? 1.1 : 0.8, { damping: 10 }),
+        scale: withSpring(translateX.value < -30 ? 1.2 : 0.8, {
+          damping: 12,
+          stiffness: 90,
+        }),
+      },
+      {
+        translateX: interpolate(
+          translateX.value,
+          [-SWIPE_THRESHOLD, 0],
+          [0, 20],
+          "clamp",
+        ),
       },
     ],
   }));
@@ -472,11 +524,20 @@ export default function KitchenScreen() {
         setOrders((prev) => [newOrder, ...prev]);
         return;
       }
-      const myItems = (newOrder.items || []).filter(
-        (item: any) => item.department === myDept,
-      );
+      const myItems = (newOrder.items || [])
+        .map((item: any, originalIndex: number) => ({
+          ...item,
+          originalIndex,
+        }))
+        .filter((item: any) => item.department === myDept);
+
       if (myItems.length > 0) {
         setOrders((prev) => [{ ...newOrder, items: myItems }, ...prev]);
+        notificationService.notify(
+          "Yangi buyurtma tushdi!",
+          Haptics.NotificationFeedbackType.Success,
+        );
+        Speech.speak("Yangi buyurtma", { language: "uz-UZ" });
       }
     });
 
@@ -485,16 +546,41 @@ export default function KitchenScreen() {
       const myDept = roleDeptMap[currentUser?.role as keyof typeof roleDeptMap];
 
       setOrders((prev) => {
-        const isExisting = prev.some((o) => o._id === updatedOrder._id);
+        const existingOrder = prev.find((o) => o._id === updatedOrder._id);
+        const isExisting = !!existingOrder;
+
         if (currentUser?.role === "owner") {
           return prev.map((o) =>
             o._id === updatedOrder._id ? updatedOrder : o,
           );
         }
-        const myItems = (updatedOrder.items || []).filter(
-          (item: any) => item.department === myDept,
-        );
+
+        const myItems = (updatedOrder.items || [])
+          .map((item: any, originalIndex: number) => ({
+            ...item,
+            originalIndex,
+          }))
+          .filter((item: any) => item.department === myDept);
+
         if (myItems.length > 0) {
+          // If items were added to an existing order, or it's a new relevant update
+          if (
+            isExisting &&
+            myItems.length > (existingOrder.items?.length || 0)
+          ) {
+            notificationService.notify(
+              "Buyurtma yangilandi!",
+              Haptics.NotificationFeedbackType.Warning,
+            );
+            Speech.speak("Buyurtma yangilandi", { language: "uz-UZ" });
+          } else if (!isExisting) {
+            notificationService.notify(
+              "Yangi buyurtma (yangilanish)!",
+              Haptics.NotificationFeedbackType.Success,
+            );
+            Speech.speak("Yangi buyurtma", { language: "uz-UZ" });
+          }
+
           if (isExisting) {
             return prev.map((o) =>
               o._id === updatedOrder._id
@@ -530,7 +616,25 @@ export default function KitchenScreen() {
       }
     });
 
-    socket.on("stockUpdated", () => {
+    socket.on("dayStarted", () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Speech.speak("Ish kuni boshlandi. Baraka bersin!", {
+        language: "uz-UZ",
+        pitch: 1.0,
+        rate: 0.9,
+      });
+      fetchOrders();
+      fetchInventory();
+    });
+
+    socket.on("dayEnded", () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Speech.speak("Ish kuni yakunlandi. Charchamang!", {
+        language: "uz-UZ",
+        pitch: 1.0,
+        rate: 0.9,
+      });
+      fetchOrders();
       fetchInventory();
     });
 
@@ -540,6 +644,8 @@ export default function KitchenScreen() {
       socket.off("transferCreated");
       socket.off("transferUpdated");
       socket.off("stockUpdated");
+      socket.off("dayStarted");
+      socket.off("dayEnded");
     };
   }, []);
 
@@ -846,50 +952,123 @@ export default function KitchenScreen() {
             )}
 
             <View style={styles.section}>
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: colors.text, marginTop: 10 },
-                ]}
-              >
-                Mavjud qoldiq
-              </Text>
-              {myStock.length === 0 ? (
-                <Text
-                  style={{
-                    color: colors.secondary,
-                    fontStyle: "italic",
-                    textAlign: "center",
-                    marginTop: 20,
-                  }}
-                >
-                  Hozircha omborda mahsulot yo'q
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Mavjud qoldiq
                 </Text>
-              ) : (
                 <View
-                  style={[styles.stockList, { backgroundColor: colors.card }]}
+                  style={[
+                    styles.stockInfoBadge,
+                    { backgroundColor: colors.accent + "15" },
+                  ]}
                 >
-                  {myStock.map((s, idx) => (
-                    <View
-                      key={s._id}
-                      style={[
-                        styles.stockRow,
-                        idx !== myStock.length - 1 && {
-                          borderBottomWidth: 1,
-                          borderBottomColor: colors.border + "50",
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.stockName, { color: colors.text }]}>
-                        {s.productId?.name}
-                      </Text>
-                      <Text
-                        style={[styles.stockQty, { color: colors.primary }]}
+                  <Text
+                    style={{
+                      color: colors.accent,
+                      fontWeight: "bold",
+                      fontSize: 12,
+                    }}
+                  >
+                    {myStock.length} tur
+                  </Text>
+                </View>
+              </View>
+
+              {myStock.length === 0 ? (
+                <View
+                  style={[styles.emptyCard, { backgroundColor: colors.card }]}
+                >
+                  <MaterialCommunityIcons
+                    name="package-variant"
+                    size={48}
+                    color={colors.secondary + "30"}
+                  />
+                  <Text
+                    style={{
+                      color: colors.secondary,
+                      fontStyle: "italic",
+                      marginTop: 10,
+                    }}
+                  >
+                    Hozircha omborda mahsulot yo'q
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.stockGrid}>
+                  {myStock.map((s) => {
+                    const isLow = s.quantity < 1; // Example low stock threshold
+                    return (
+                      <View
+                        key={s._id}
+                        style={[
+                          styles.stockGridItem,
+                          {
+                            backgroundColor: colors.card,
+                            borderColor: isLow
+                              ? colors.danger + "30"
+                              : colors.border + "50",
+                          },
+                        ]}
                       >
-                        {s.quantity} {s.productId?.unit}
-                      </Text>
-                    </View>
-                  ))}
+                        <View
+                          style={[
+                            styles.stockIconBox,
+                            {
+                              backgroundColor: isLow
+                                ? colors.danger + "10"
+                                : colors.primary + "05",
+                            },
+                          ]}
+                        >
+                          <MaterialCommunityIcons
+                            name={
+                              isLow
+                                ? "alert-circle-outline"
+                                : "package-variant-closed"
+                            }
+                            size={20}
+                            color={isLow ? colors.danger : colors.primary}
+                          />
+                        </View>
+                        <Text
+                          style={[styles.stockGridName, { color: colors.text }]}
+                          numberOfLines={1}
+                        >
+                          {s.productId?.name}
+                        </Text>
+                        <View style={styles.stockGridFooter}>
+                          <Text
+                            style={[
+                              styles.stockGridQty,
+                              { color: isLow ? colors.danger : colors.text },
+                            ]}
+                          >
+                            {Number(s.quantity).toLocaleString(undefined, {
+                              maximumFractionDigits: 3,
+                            })}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.stockGridUnit,
+                              { color: colors.secondary },
+                            ]}
+                          >
+                            {s.productId?.unit}
+                          </Text>
+                        </View>
+                        {isLow && (
+                          <View
+                            style={[
+                              styles.lowStockTag,
+                              { backgroundColor: colors.danger },
+                            ]}
+                          >
+                            <Text style={styles.lowStockText}>KAM</Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
                 </View>
               )}
             </View>
@@ -1153,4 +1332,77 @@ const styles = StyleSheet.create({
   },
   stockName: { fontSize: 16, fontWeight: "500" },
   stockQty: { fontSize: 16, fontWeight: "bold" },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  stockInfoBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  emptyCard: {
+    padding: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(0,0,0,0.1)",
+  },
+  stockGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  stockGridItem: {
+    width: (SCREEN_WIDTH - 52) / 2,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    position: "relative",
+    overflow: "hidden",
+  },
+  stockIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  stockGridName: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  stockGridFooter: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 4,
+  },
+  stockGridQty: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  stockGridUnit: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  lowStockTag: {
+    position: "absolute",
+    top: 10,
+    right: -15,
+    paddingHorizontal: 20,
+    paddingVertical: 2,
+    transform: [{ rotate: "45deg" }],
+  },
+  lowStockText: {
+    color: "white",
+    fontSize: 8,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
 });

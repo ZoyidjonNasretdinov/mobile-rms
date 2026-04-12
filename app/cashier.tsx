@@ -21,7 +21,9 @@ import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
 import * as Haptics from "expo-haptics";
+import * as Speech from "expo-speech";
 import { socketService } from "@/utils/socket";
+import { notificationService } from "@/utils/notifications";
 
 const t = Translations.uz.cashier;
 const common = Translations.uz.common;
@@ -80,12 +82,36 @@ export default function CashierScreen() {
 
       const handleUpdate = () => fetchOrders();
 
-      socket.on("orderCreated", handleUpdate);
+      socket.on("orderCreated", () => {
+        handleUpdate();
+        notificationService.notify(
+          "Yangi buyurtma tushdi!",
+          Haptics.NotificationFeedbackType.Success,
+        );
+      });
       socket.on("orderUpdated", handleUpdate);
+
+      socket.on("dayStarted", () => {
+        notificationService.notify(
+          "Ish kuni boshlandi. Baraka bersin!",
+          Haptics.NotificationFeedbackType.Success,
+        );
+        fetchOrders();
+      });
+
+      socket.on("dayEnded", () => {
+        notificationService.notify(
+          "Ish kuni yakunlandi. Charchamang!",
+          Haptics.NotificationFeedbackType.Warning,
+        );
+        fetchOrders();
+      });
 
       return () => {
         socket.off("orderCreated", handleUpdate);
         socket.off("orderUpdated", handleUpdate);
+        socket.off("dayStarted");
+        socket.off("dayEnded");
       };
     }, [activeTab]),
   );
@@ -110,8 +136,10 @@ export default function CashierScreen() {
       setSelectedOrder(null);
       fetchOrders();
       Alert.alert("Muvaffaqiyat", "To'lov qabul qilindi va stol bo'shatildi.");
-    } catch (error) {
-      Alert.alert(common.error, "To'lovni yakunlab bo'lmadi");
+    } catch (error: any) {
+      console.error("Payment error:", error.response?.data || error.message);
+      const msg = error.response?.data?.message || "To'lovni yakunlab bo'lmadi";
+      Alert.alert(common.error, msg);
     } finally {
       setProcessing(false);
     }
@@ -305,7 +333,9 @@ export default function CashierScreen() {
                           backgroundColor:
                             order.status === "Paid"
                               ? colors.success + "15"
-                              : colors.warning + "15",
+                              : order.status === "Ready"
+                                ? colors.success + "30"
+                                : colors.warning + "15",
                         },
                       ]}
                     >
@@ -320,7 +350,11 @@ export default function CashierScreen() {
                           },
                         ]}
                       >
-                        {order.status === "Paid" ? "To'landi" : "Kutilmoqda"}
+                        {order.status === "Paid"
+                          ? "To'landi"
+                          : order.status === "Ready"
+                            ? "Tayyor"
+                            : "Faol"}
                       </Text>
                     </View>
                   </View>

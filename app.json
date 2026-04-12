@@ -13,7 +13,14 @@
     "android": {
       "package": "com.rms.smart.boshqaruv",
       "versionCode": 2,
-      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE", "VIBRATE"],
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "VIBRATE",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/logo.png"

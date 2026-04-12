@@ -158,7 +158,7 @@ export default function CreateMenuItemScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setRecipeIngredients([
       ...recipeIngredients,
-      { productId: "", quantity: "", productName: "", unit: "" },
+      { productId: "", quantity: "", productName: "", unit: "", cost: 0 },
     ]);
   };
 
@@ -345,24 +345,32 @@ export default function CreateMenuItemScreen() {
             />
           </View>
 
-          <View style={styles.recipeSection}>
+          <View
+            style={[
+              styles.recipeSection,
+              {
+                backgroundColor: colors.card,
+                borderRadius: 20,
+                padding: 15,
+                borderWidth: 1,
+                borderColor: colors.border,
+              },
+            ]}
+          >
             <View style={styles.recipeHeader}>
-              <Text style={[styles.label, { color: colors.text }]}>
-                Retsept (Masalliqlar)
-              </Text>
+              <View>
+                <Text
+                  style={[styles.label, { color: colors.text, fontSize: 16 }]}
+                >
+                  Retsept (Masalliqlar)
+                </Text>
+              </View>
               <TouchableOpacity
                 onPress={addIngredient}
-                style={[
-                  styles.addIngBtn,
-                  { backgroundColor: colors.primary + "15" },
-                ]}
+                style={[styles.addIngBtn, { backgroundColor: colors.primary }]}
               >
-                <MaterialCommunityIcons
-                  name="plus"
-                  size={20}
-                  color={colors.primary}
-                />
-                <Text style={{ color: colors.primary, fontWeight: "bold" }}>
+                <MaterialCommunityIcons name="plus" size={20} color="white" />
+                <Text style={{ color: "white", fontWeight: "bold" }}>
                   Qo'shish
                 </Text>
               </TouchableOpacity>
@@ -373,7 +381,10 @@ export default function CreateMenuItemScreen() {
                 key={index}
                 style={[
                   styles.ingredientCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
                 ]}
               >
                 <View style={styles.ingMain}>
@@ -381,21 +392,24 @@ export default function CreateMenuItemScreen() {
                     onPress={() => openProductPicker(index)}
                     style={[
                       styles.ingSelectToggle,
-                      { backgroundColor: colors.background },
+                      { backgroundColor: colors.card },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.ingNameText,
-                        {
-                          color: ing.productName
-                            ? colors.text
-                            : colors.secondary,
-                        },
-                      ]}
-                    >
-                      {ing.productName || "Masalliqni tanlang..."}
-                    </Text>
+                    <View style={styles.ingInfoCol}>
+                      <Text
+                        style={[
+                          styles.ingNameText,
+                          {
+                            color: ing.productName
+                              ? colors.text
+                              : colors.secondary,
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {ing.productName || "Tanlang..."}
+                      </Text>
+                    </View>
                     <MaterialCommunityIcons
                       name="chevron-down"
                       size={20}
@@ -409,11 +423,13 @@ export default function CreateMenuItemScreen() {
                         styles.ingQtyInput,
                         {
                           color: colors.text,
-                          backgroundColor: colors.background,
+                          backgroundColor: colors.card,
+                          borderColor: colors.border,
+                          borderWidth: 1,
                         },
                       ]}
                       placeholder="0.0"
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
                       value={ing.quantity}
                       onChangeText={(val) =>
                         updateIngredient(index, "quantity", val)
@@ -431,12 +447,10 @@ export default function CreateMenuItemScreen() {
                       }}
                       style={[
                         styles.unitBadgeBtn,
-                        { backgroundColor: colors.primary + "10" },
+                        { backgroundColor: colors.primary },
                       ]}
                     >
-                      <Text
-                        style={[styles.unitLabel, { color: colors.primary }]}
-                      >
+                      <Text style={[styles.unitLabel, { color: "white" }]}>
                         {ing.unit || "ta"}
                       </Text>
                     </TouchableOpacity>
@@ -448,9 +462,9 @@ export default function CreateMenuItemScreen() {
                   style={styles.removeIngBtn}
                 >
                   <MaterialCommunityIcons
-                    name="trash-can-outline"
-                    size={22}
-                    color={colors.danger}
+                    name="close-circle"
+                    size={24}
+                    color={colors.danger + "80"}
                   />
                 </TouchableOpacity>
               </View>
@@ -538,24 +552,54 @@ export default function CreateMenuItemScreen() {
                       { borderBottomColor: colors.border },
                     ]}
                   >
-                    <View>
+                    <View style={styles.modalProductInfo}>
                       <Text
                         style={[styles.productName, { color: colors.text }]}
                       >
                         {p.name}
                       </Text>
-                      <Text
-                        style={[
-                          styles.productUnit,
-                          { color: colors.secondary },
-                        ]}
-                      >
-                        {p.unit}
-                      </Text>
+                      <View style={styles.productMetaRow}>
+                        <Text
+                          style={[
+                            styles.productUnit,
+                            { color: colors.secondary },
+                          ]}
+                        >
+                          Qoldiq:{" "}
+                          <Text
+                            style={{
+                              fontWeight: "bold",
+                              color:
+                                p.currentStock < 1
+                                  ? colors.danger
+                                  : colors.text,
+                            }}
+                          >
+                            {p.currentStock} {p.unit}
+                          </Text>
+                        </Text>
+                        <Text style={{ color: colors.secondary, fontSize: 12 }}>
+                          {" "}
+                          •{" "}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.productUnit,
+                            { color: colors.secondary },
+                          ]}
+                        >
+                          Narxi:{" "}
+                          <Text
+                            style={{ fontWeight: "bold", color: colors.text }}
+                          >
+                            {p.costPerUnit?.toLocaleString()} so'm
+                          </Text>
+                        </Text>
+                      </View>
                     </View>
                     <MaterialCommunityIcons
-                      name="plus"
-                      size={20}
+                      name="plus-circle-outline"
+                      size={24}
                       color={colors.primary}
                     />
                   </TouchableOpacity>
@@ -725,5 +769,16 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     minWidth: 36,
     alignItems: "center",
+  },
+  ingInfoCol: {
+    flex: 1,
+  },
+  modalProductInfo: {
+    flex: 1,
+  },
+  productMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
   },
 });

@@ -60,28 +60,43 @@ export default function CreateOrderScreen() {
 
         // If editing an existing order, load its items
         if (orderId) {
-          const orderRes = await axios.get(`${API_BASE_URL}/orders`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const existingOrder = orderRes.data.find(
-            (o: any) => o._id === orderId,
+          const orderRes = await axios.get(
+            `${API_BASE_URL}/orders/${orderId}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
           );
+          const existingOrder = orderRes.data;
+
           if (existingOrder) {
             const initialCart: { [key: string]: any } = {};
             const initialOrig: { [key: string]: number } = {};
             existingOrder.items.forEach((item: any, idx: number) => {
               const menuItem = itemsRes.data.find(
-                (mi: any) => mi.name === item.name,
+                (mi: any) => mi.name.toLowerCase() === item.name.toLowerCase(),
               );
               const itemId = menuItem?._id || `old-${idx}`;
-              initialCart[itemId] = {
+              const cartKey =
+                itemId +
+                (item.status && item.status !== "Pending"
+                  ? `-${item.status}`
+                  : "");
+
+              initialCart[cartKey] = {
                 _id: itemId,
                 name: item.name,
                 price: item.price,
                 quantity: item.quantity,
                 categoryId: menuItem?.categoryId,
+                status: item.status,
+                department: item.department,
               };
-              initialOrig[itemId] = item.quantity;
+              if (item.status && item.status !== "Pending") {
+                // For non-pending items, the original quantity is specific to that entry
+                initialOrig[cartKey] = item.quantity;
+              } else {
+                initialOrig[itemId] = item.quantity;
+              }
             });
             setCart(initialCart);
             setOriginalQuantities(initialOrig);
@@ -99,31 +114,45 @@ export default function CreateOrderScreen() {
 
   const updateQuantity = (item: any, delta: number) => {
     const newCart = { ...cart };
-    const originalQty = originalQuantities[item._id] || 0;
 
-    if (!newCart[item._id]) {
-      if (delta > 0) {
-        newCart[item._id] = { ...item, quantity: delta };
+    if (delta > 0) {
+      // Adding: Always target a "Pending" entry
+      const pendingKey = item._id;
+      if (!newCart[pendingKey]) {
+        newCart[pendingKey] = {
+          ...item,
+          quantity: delta,
+          status: "Pending",
+        };
+      } else {
+        newCart[pendingKey].quantity += delta;
       }
     } else {
-      const currentQty = newCart[item._id].quantity;
-      if (delta < 0 && currentQty <= originalQty) {
-        Alert.alert("Cheklov", "Avvalgi buyurtmani kamaytirib bo'lmaydi");
-        return;
-      }
-      newCart[item._id].quantity += delta;
-      if (newCart[item._id].quantity <= 0) {
-        delete newCart[item._id];
+      // Subtracting: Target the specific item clicked
+      const cartKey =
+        item._id +
+        (item.status && item.status !== "Pending" ? `-${item.status}` : "");
+      if (newCart[cartKey]) {
+        const originalQty = originalQuantities[cartKey] || 0;
+        if (newCart[cartKey].quantity <= originalQty) {
+          Alert.alert("Cheklov", "Avvalgi buyurtmani kamaytirib bo'lmaydi");
+          return;
+        }
+        newCart[cartKey].quantity += delta;
+        if (newCart[cartKey].quantity <= 0) {
+          delete newCart[cartKey];
+        }
       }
     }
     setCart(newCart);
   };
 
   const calculateTotal = () => {
-    return Object.values(cart).reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0,
-    );
+    return Object.values(cart).reduce((sum, item) => {
+      const price = Number(item.price) || 0;
+      const quantity = Number(item.quantity) || 0;
+      return sum + price * quantity;
+    }, 0);
   };
 
   const handleSaveOrder = async () => {
@@ -146,18 +175,22 @@ export default function CreateOrderScreen() {
           name: item.name,
           quantity: item.quantity,
           price: item.price,
+          status: item.status || "Pending",
+          department: item.department,
         })),
-        waiterId: user?._id,
-        waiterName: user?.fullName,
+        waiterId: user?.id || user?._id || "unknown",
+        waiterName: user?.fullName || "Ofitsiant",
         totalAmount: calculateTotal(),
         status: "Active",
       };
 
       if (orderId) {
+        console.log("Updating order:", orderId, JSON.stringify(orderData));
         await axios.put(`${API_BASE_URL}/orders/${orderId}`, orderData, {
           headers: { Authorization: `Bearer ${token}` },
         });
       } else {
+        console.log("Creating new order:", JSON.stringify(orderData));
         await axios.post(`${API_BASE_URL}/orders`, orderData, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -167,7 +200,11 @@ export default function CreateOrderScreen() {
         { text: "OK", onPress: () => router.back() },
       ]);
     } catch (error: any) {
-      console.error("Save order error:", error);
+      console.error("Save order error details:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
       const msg =
         error.response?.data?.message ||
         "Buyurtmani saqlashda xatolik yuz berdi";
@@ -204,9 +241,78 @@ export default function CreateOrderScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>
-          {tableName}-stol : Yangi buyurtma
+          {tableName}-stol : Buyurtma olish
         </Text>
       </View>
+
+      {/* Order Summary Section */}
+      {Object.keys(cart).length > 0 && (
+        <View style={[styles.summarySection, { backgroundColor: colors.card }]}>
+          <View style={styles.summaryHeader}>
+            <MaterialCommunityIcons
+              name="clipboard-list-outline"
+              size={18}
+              color={colors.primary}
+            />
+            <Text style={[styles.summaryTitle, { color: colors.text }]}>
+              Buyurtma tarkibi
+            </Text>
+            <Text style={[styles.itemCount, { color: colors.secondary }]}>
+              ({Object.keys(cart).length} taom)
+            </Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.summaryScroll}
+          >
+            {Object.values(cart).map((item) => {
+              let info = { label: "Yangi", color: "#F59E0B" }; // Orange for New
+              if (item.status === "Ready") {
+                info = { label: "Tayyor", color: "#10B981" }; // Green for Ready
+              } else if (originalQuantities[item._id]) {
+                info = { label: "Saqlangan", color: "#3B82F6" }; // Blue for Saved
+              }
+              return (
+                <View
+                  key={item._id}
+                  style={[
+                    styles.summaryCard,
+                    { borderColor: info.color + "40" },
+                  ]}
+                >
+                  <View
+                    style={[styles.statusLine, { backgroundColor: info.color }]}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.summaryItemName, { color: colors.text }]}
+                  >
+                    {item.name}
+                  </Text>
+                  <View style={styles.summaryQtyRow}>
+                    <Text style={[styles.summaryQty, { color: info.color }]}>
+                      {item.quantity} dona
+                    </Text>
+                    <View
+                      style={[
+                        styles.smallBadge,
+                        { backgroundColor: info.color + "15" },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.smallBadgeText, { color: info.color }]}
+                      >
+                        {info.label}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
 
       <View style={styles.searchContainer}>
         <View style={[styles.searchInputRow, { backgroundColor: colors.card }]}>
@@ -419,4 +525,46 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveBtnText: { color: "white", fontSize: 16, fontWeight: "bold" },
+  summarySection: {
+    marginHorizontal: 20,
+    marginBottom: 15,
+    borderRadius: 16,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  summaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  summaryTitle: { fontSize: 14, fontWeight: "700" },
+  itemCount: { fontSize: 12 },
+  summaryScroll: { gap: 10, paddingRight: 20 },
+  summaryCard: {
+    width: 140,
+    backgroundColor: "rgba(0,0,0,0.02)",
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    gap: 4,
+  },
+  statusLine: { height: 2, borderRadius: 1, marginBottom: 4 },
+  summaryItemName: { fontSize: 13, fontWeight: "600" },
+  summaryQtyRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  summaryQty: { fontSize: 12, fontWeight: "700" },
+  smallBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  smallBadgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
 });

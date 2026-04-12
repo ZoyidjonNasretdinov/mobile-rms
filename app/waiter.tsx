@@ -18,6 +18,10 @@ import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
 import { socketService } from "@/utils/socket";
+import * as Speech from "expo-speech";
+import * as Haptics from "expo-haptics";
+import { useRef } from "react";
+import { notificationService } from "@/utils/notifications";
 
 import { Translations } from "@/constants/translations";
 
@@ -29,20 +33,28 @@ export default function WaiterStationScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
 
-  const [activeTab, setActiveTab] = useState<"tables" | "myOrders">("tables");
+  const [activeTab, setActiveTab] = useState<
+    "tables" | "myOrders" | "notifications"
+  >("tables");
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tables, setTables] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const userRef = useRef<any>(null);
   const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
+  const [isShiftActive, setIsShiftActive] = useState(true); // Default to true to avoid flicker
 
   const fetchData = async () => {
     try {
       const token = await Storage.getItem("access_token");
       const userStr = await Storage.getItem("user");
       if (userStr) {
-        setUser(JSON.parse(userStr));
+        const parsedUser = JSON.parse(userStr);
+        setUser(parsedUser);
+        userRef.current = parsedUser;
       }
 
       // Fetch Tables
@@ -85,6 +97,16 @@ export default function WaiterStationScreen() {
         },
       );
       setOrders(ordersRes.data);
+
+      // Check shift status
+      try {
+        const shiftRes = await axios.get(`${API_BASE_URL}/shifts/active`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setIsShiftActive(!!shiftRes.data);
+      } catch (e) {
+        setIsShiftActive(false);
+      }
     } catch (error) {
       console.error("Waiter fetch error:", error);
     } finally {
@@ -108,13 +130,92 @@ export default function WaiterStationScreen() {
     });
 
     socket.on("itemReady", (data: any) => {
-      // Only notify if this is my order
-      if (data.waiterId === user?._id) {
-        Alert.alert(
-          "Taom Tayyor!",
-          `${data.tableName}-stol uchun "${data.itemName}" tayyor bo'ldi.`,
-          [{ text: "Tushunarli" }],
+      const currentUser = userRef.current;
+      const currentUserId = currentUser?.id || currentUser?._id;
+      if (!data.waiterId || data.waiterId === currentUserId) {
+        const floorStr = data.floor ? `${data.floor}-qavat, ` : "";
+        const msg = `${floorStr}${data.tableName}-stol uchun ${data.itemName} tayyor bo'ldi.`;
+        notificationService.notify(
+          msg,
+          Haptics.NotificationFeedbackType.Success,
         );
+
+        setNotifications((prev) =>
+          [
+            {
+              id: Date.now().toString(),
+              message: msg,
+              time: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              icon: "check-circle",
+              color: colors.success,
+            },
+            ...prev,
+          ].slice(0, 50),
+        );
+        setUnreadCount((c) => c + 1);
+
+        Alert.alert("Taom Tayyor!", msg, [{ text: "Tushunarli" }], {
+          cancelable: true,
+        });
+      }
+    });
+
+    socket.on("itemCooking", (data: any) => {
+      const currentUser = userRef.current;
+      const currentUserId = currentUser?.id || currentUser?._id;
+      if (!data.waiterId || data.waiterId === currentUserId) {
+        const floorStr = data.floor ? `${data.floor}-qavat, ` : "";
+        const msg = `${floorStr}${data.tableName}-stol: ${data.itemName} jarayonga o'tkazildi 🍳`;
+        setNotifications((prev) =>
+          [
+            {
+              id: Date.now().toString(),
+              message: msg,
+              time: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              icon: "chef-hat",
+              color: "#F59E0B",
+            },
+            ...prev,
+          ].slice(0, 50),
+        );
+        setUnreadCount((c) => c + 1);
+      }
+    });
+
+    socket.on("orderPaid", (data: any) => {
+      const currentUser = userRef.current;
+      const currentUserId = currentUser?.id || currentUser?._id;
+      if (!data.waiterId || data.waiterId === currentUserId) {
+        const floorStr = data.floor ? `${data.floor}-qavat, ` : "";
+        const method = data.paymentMethod === "Online" ? "(Onlayn)" : "(Naqd)";
+        const msg = `${floorStr}${data.tableName}-stol to'lovi qabul qilindi ${method}. Summa: ${data.totalAmount?.toLocaleString()} so'm.`;
+        notificationService.notify(
+          msg,
+          Haptics.NotificationFeedbackType.Success,
+        );
+        setNotifications((prev) =>
+          [
+            {
+              id: Date.now().toString(),
+              message: msg,
+              time: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              icon: "cash-check",
+              color: "#10B981",
+            },
+            ...prev,
+          ].slice(0, 50),
+        );
+        setUnreadCount((c) => c + 1);
+        fetchData();
       }
     });
 
@@ -124,42 +225,53 @@ export default function WaiterStationScreen() {
       );
     });
 
+    socket.on("dayStarted", () => {
+      const msg = "Ish kuni boshlandi. Baraka bersin!";
+      notificationService.notify(msg, Haptics.NotificationFeedbackType.Success);
+      setNotifications((prev) => [
+        {
+          id: Date.now().toString(),
+          message: msg,
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          icon: "sun-clock",
+          color: colors.primary,
+        },
+        ...prev,
+      ]);
+      fetchData();
+    });
+
+    socket.on("dayEnded", () => {
+      const msg = "Ish kuni yakunlandi. Charchamang!";
+      notificationService.notify(msg, Haptics.NotificationFeedbackType.Warning);
+      setNotifications((prev) => [
+        {
+          id: Date.now().toString(),
+          message: msg,
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          icon: "moon-star",
+          color: colors.warning,
+        },
+        ...prev,
+      ]);
+      fetchData();
+    });
+
     return () => {
       socket.off("orderCreated");
       socket.off("orderUpdated");
       socket.off("itemReady");
+      socket.off("itemCooking");
+      socket.off("orderPaid");
       socket.off("tableUpdated");
     };
   }, []);
-
-  const handleConfirmPayment = async (orderId: string) => {
-    Alert.alert(
-      "To'lovni tasdiqlash",
-      "Haqiqatan ham ushbu buyurtma uchun to'lov qabul qilindimi?",
-      [
-        { text: "Yo'q", style: "cancel" },
-        {
-          text: "Ha",
-          onPress: async () => {
-            try {
-              const token = await Storage.getItem("access_token");
-              await axios.put(
-                `${API_BASE_URL}/orders/${orderId}`,
-                { status: "Paid" },
-                {
-                  headers: { Authorization: `Bearer ${token}` },
-                },
-              );
-              fetchData();
-            } catch (error) {
-              console.error("Payment confirmation error:", error);
-              Alert.alert("Xatolik", "To'lovni tasdiqlashda xatolik yuz berdi");
-            }
-          },
-        },
-      ],
-    );
-  };
 
   const handleLogout = async () => {
     await Storage.removeItem("access_token");
@@ -179,7 +291,8 @@ export default function WaiterStationScreen() {
     </View>
   );
 
-  const myOrders = orders.filter((o) => o.waiterId === user?._id);
+  const myUserId = user?.id || user?._id;
+  const myOrders = orders.filter((o) => o.waiterId === myUserId);
   const floors = [...new Set(tables.map((t: any) => t.floor || 1))].sort(
     (a: any, b: any) => (a as number) - (b as number),
   ) as number[];
@@ -252,6 +365,13 @@ export default function WaiterStationScreen() {
           status !== "Vacant" && { borderColor: statusColor, borderWidth: 1 },
         ]}
         onPress={() => {
+          if (!isShiftActive) {
+            Alert.alert(
+              "Ish kuni boshlanmagan",
+              "Iltimos, boshliq kunni boshlashini kuting.",
+            );
+            return;
+          }
           router.push({
             pathname: "/create-order",
             params: {
@@ -337,79 +457,154 @@ export default function WaiterStationScreen() {
                 <Text style={[styles.metaLabel, { color: colors.secondary }]}>
                   {t.amount}
                 </Text>
-                <Text style={[styles.metaAmount, { color: statusColor }]}>
-                  {activeOrder.totalAmount?.toLocaleString()}{" "}
-                  {Translations.uz.common.currency}
+                <Text style={[styles.tableStatus, { color: statusColor }]}>
+                  {status === "Ready" ? (
+                    "Tayyor"
+                  ) : (
+                    <View style={{ flexDirection: "row", gap: 6 }}>
+                      {activeOrder.items?.filter(
+                        (i: any) => i.status === "Ready",
+                      ).length > 0 && (
+                        <Text
+                          style={{
+                            color: colors.success,
+                            fontSize: 11,
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {
+                            activeOrder.items.filter(
+                              (i: any) => i.status === "Ready",
+                            ).length
+                          }{" "}
+                          tayyor
+                        </Text>
+                      )}
+                      {activeOrder.items?.filter(
+                        (i: any) => i.status !== "Ready",
+                      ).length > 0 && (
+                        <Text
+                          style={{
+                            color: colors.accent,
+                            fontSize: 11,
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {
+                            activeOrder.items.filter(
+                              (i: any) => i.status !== "Ready",
+                            ).length
+                          }{" "}
+                          kutilmoqda
+                        </Text>
+                      )}
+                    </View>
+                  )}
                 </Text>
               </View>
             </View>
-
-            <TouchableOpacity
-              style={[styles.payBtn, { backgroundColor: colors.primary }]}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleConfirmPayment(activeOrder._id);
+            {/* Total amount prominently shown */}
+            <Text
+              style={{
+                color: statusColor,
+                fontSize: 15,
+                fontWeight: "800",
+                marginTop: 6,
               }}
             >
-              <Text style={styles.payBtnText}>To'lov</Text>
-            </TouchableOpacity>
+              {activeOrder.totalAmount?.toLocaleString()}{" "}
+              {Translations.uz.common.currency}
+            </Text>
           </View>
         )}
       </TouchableOpacity>
     );
   };
 
-  const OrderRow = ({ order }: { order: any }) => (
-    <TouchableOpacity
-      style={[styles.orderRow, { backgroundColor: colors.card }]}
-      onPress={() => {
-        router.push({
-          pathname: "/create-order",
-          params: {
-            tableId: order.tableId,
-            tableName: order.tableName,
-            orderId: order._id,
-          },
-        });
-      }}
-    >
-      <View style={styles.orderLeft}>
-        <View
-          style={[
-            styles.tableNumberCircle,
-            { backgroundColor: colors.primary + "15" },
-          ]}
-        >
-          <MaterialCommunityIcons
-            name="table-chair"
-            size={14}
-            color={colors.primary}
-          />
-          <Text style={[styles.tableNumberText, { color: colors.primary }]}>
-            {order.tableName}
+  const OrderRow = ({ order }: { order: any }) => {
+    const readyCount =
+      order.items?.filter((i: any) => i.status === "Ready").length || 0;
+    const pendingCount =
+      order.items?.filter((i: any) => i.status !== "Ready").length || 0;
+
+    return (
+      <TouchableOpacity
+        style={[styles.orderRow, { backgroundColor: colors.card }]}
+        onPress={() => {
+          router.push({
+            pathname: "/create-order",
+            params: {
+              tableId: order.tableId,
+              tableName: order.tableName,
+              orderId: order._id,
+            },
+          });
+        }}
+      >
+        <View style={styles.orderLeft}>
+          <View
+            style={[
+              styles.tableNumberCircle,
+              { backgroundColor: colors.primary + "15" },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="table-chair"
+              size={14}
+              color={colors.primary}
+            />
+            <Text style={[styles.tableNumberText, { color: colors.primary }]}>
+              {order.tableName}
+            </Text>
+          </View>
+          <View>
+            <Text style={[styles.orderTimeText, { color: colors.secondary }]}>
+              {new Date(order.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </Text>
+            <View
+              style={{ flexDirection: "row", gap: 6, alignItems: "center" }}
+            >
+              <Text style={[styles.orderStatusText, { color: colors.text }]}>
+                {order.status === "Paid" ? "To'langan" : "Faol"}
+              </Text>
+              {readyCount > 0 && (
+                <Text
+                  style={{
+                    color: colors.success,
+                    fontSize: 11,
+                    fontWeight: "bold",
+                  }}
+                >
+                  {readyCount} tayyor
+                </Text>
+              )}
+              {pendingCount > 0 && (
+                <Text
+                  style={{
+                    color: colors.accent,
+                    fontSize: 11,
+                    fontWeight: "bold",
+                  }}
+                >
+                  {pendingCount} kutilmoqda
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
+        <View style={styles.orderRight}>
+          <View style={styles.badgeRow}>{getReadinessIndicators(order)}</View>
+          <Text style={[styles.orderAmountText, { color: colors.text }]}>
+            {order.totalAmount?.toLocaleString()}{" "}
+            {Translations.uz.common.currency}
           </Text>
         </View>
-        <View>
-          <Text style={[styles.orderTimeText, { color: colors.secondary }]}>
-            {new Date(order.createdAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </Text>
-          <Text style={[styles.orderStatusText, { color: colors.text }]}>
-            {order.status === "Paid" ? "To'langan" : "Faol"}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.orderRight}>
-        <View style={styles.badgeRow}>{getReadinessIndicators(order)}</View>
-        <Text style={[styles.orderAmountText, { color: colors.text }]}>
-          {order.totalAmount?.toLocaleString()}{" "}
-          {Translations.uz.common.currency}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView
@@ -441,6 +636,28 @@ export default function WaiterStationScreen() {
           />
         </TouchableOpacity>
       </View>
+
+      {!isShiftActive && (
+        <View
+          style={{
+            backgroundColor: "#F59E0B",
+            padding: 10,
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          <MaterialCommunityIcons
+            name="alert-outline"
+            size={20}
+            color="white"
+          />
+          <Text style={{ color: "white", fontWeight: "bold", fontSize: 13 }}>
+            Ish kuni boshlanmagan. Zakaz berib bo'lmaydi.
+          </Text>
+        </View>
+      )}
 
       <View style={styles.statsRow}>
         <StatBox
@@ -490,22 +707,40 @@ export default function WaiterStationScreen() {
         <TouchableOpacity
           style={[
             styles.tabItem,
-            activeTab === "myOrders" && { backgroundColor: colors.primary },
+            activeTab === "notifications" && {
+              backgroundColor: colors.primary,
+            },
           ]}
-          onPress={() => setActiveTab("myOrders")}
+          onPress={() => {
+            setActiveTab("notifications");
+            setUnreadCount(0);
+          }}
         >
-          <MaterialCommunityIcons
-            name="clipboard-list-outline"
-            size={20}
-            color={activeTab === "myOrders" ? "white" : colors.secondary}
-          />
+          <View>
+            <MaterialCommunityIcons
+              name="bell-outline"
+              size={20}
+              color={activeTab === "notifications" ? "white" : colors.secondary}
+            />
+            {unreadCount > 0 && activeTab !== "notifications" && (
+              <View
+                style={[
+                  styles.notifBadge,
+                  { backgroundColor: colors.danger || "#EF4444" },
+                ]}
+              />
+            )}
+          </View>
           <Text
             style={[
               styles.tabText,
-              { color: activeTab === "myOrders" ? "white" : colors.secondary },
+              {
+                color:
+                  activeTab === "notifications" ? "white" : colors.secondary,
+              },
             ]}
           >
-            Buyurtmalarim
+            Bildirishnomalar
           </Text>
         </TouchableOpacity>
       </View>
@@ -562,7 +797,7 @@ export default function WaiterStationScreen() {
                 <TableCard key={table._id} table={table} />
               ))}
             </View>
-          ) : (
+          ) : activeTab === "myOrders" ? (
             <View style={styles.myOrdersList}>
               {myOrders.length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.secondary }]}>
@@ -571,6 +806,56 @@ export default function WaiterStationScreen() {
               ) : (
                 myOrders.map((order) => (
                   <OrderRow key={order._id} order={order} />
+                ))
+              )}
+            </View>
+          ) : (
+            <View style={styles.myOrdersList}>
+              {notifications.length === 0 ? (
+                <Text style={[styles.emptyText, { color: colors.secondary }]}>
+                  Bildirishnomalar mavjud emas
+                </Text>
+              ) : (
+                notifications.map((notif) => (
+                  <View
+                    key={notif.id}
+                    style={[styles.orderRow, { backgroundColor: colors.card }]}
+                  >
+                    <View style={styles.orderLeft}>
+                      <View
+                        style={[
+                          styles.tableNumberCircle,
+                          {
+                            backgroundColor: (notif.color || "#34C759") + "15",
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name={notif.icon || "bell"}
+                          size={20}
+                          color={notif.color || colors.primary}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.orderTimeText,
+                            { color: colors.secondary },
+                          ]}
+                        >
+                          {notif.time}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.orderStatusText,
+                            { color: colors.text, fontSize: 13 },
+                          ]}
+                        >
+                          {notif.message}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
                 ))
               )}
             </View>
@@ -685,6 +970,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  tableStatus: { fontSize: 13, fontWeight: "600" },
   vacantContent: {
     flex: 1,
     justifyContent: "center",
@@ -750,4 +1036,14 @@ const styles = StyleSheet.create({
   orderAmountText: { fontSize: 15, fontWeight: "bold" },
   emptyText: { textAlign: "center", marginTop: 50, fontSize: 14 },
   bottomSpace: { height: 40 },
+  notifBadge: {
+    position: "absolute",
+    right: -4,
+    top: -4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: "white",
+  },
 });

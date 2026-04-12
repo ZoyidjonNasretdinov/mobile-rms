@@ -42,6 +42,7 @@ export default function InventoryStatusScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState(common.all);
+  const [activeView, setActiveView] = useState<"status" | "history">("status");
 
   // Distribution Modal State
   const [distributeModal, setDistributeModal] = useState(false);
@@ -65,7 +66,7 @@ export default function InventoryStatusScreen() {
           axios.get(`${API_BASE_URL}/inventory/products`, { headers }),
           axios.get(`${API_BASE_URL}/inventory/categories`, { headers }),
           axios.get(`${API_BASE_URL}/inventory/department-stats`, { headers }),
-          axios.get(`${API_BASE_URL}/inventory/logs?limit=10`, { headers }),
+          axios.get(`${API_BASE_URL}/inventory/logs?limit=50`, { headers }),
           axios.get(`${API_BASE_URL}/inventory/all-staff-stock`, { headers }),
         ]);
 
@@ -352,256 +353,409 @@ export default function InventoryStatusScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchContainer}>
-        <View
+      <View style={styles.viewTabs}>
+        <TouchableOpacity
           style={[
-            styles.searchBar,
-            { backgroundColor: colors.card, borderColor: colors.border },
+            styles.viewTab,
+            activeView === "status" && styles.activeViewTab,
           ]}
+          onPress={() => setActiveView("status")}
         >
           <MaterialCommunityIcons
-            name="magnify"
+            name="package-variant"
             size={20}
-            color={colors.secondary}
+            color={activeView === "status" ? "white" : colors.secondary}
           />
-          <TextInput
-            placeholder={t.searchPlaceholder}
-            placeholderTextColor={colors.secondary}
-            style={[styles.searchInput, { color: colors.text }]}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-      </View>
-
-      <View style={styles.categoryScroll}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryContainer}
-        >
-          <TouchableOpacity
-            onPress={() => setActiveCategory(common.all)}
+          <Text
             style={[
-              styles.categoryBtn,
-              activeCategory === common.all && {
-                backgroundColor: colors.primary,
-              },
+              styles.viewTabText,
+              { color: activeView === "status" ? "white" : colors.secondary },
             ]}
           >
-            <Text
-              style={[
-                styles.categoryText,
-                activeCategory === common.all
-                  ? { color: "white" }
-                  : { color: colors.secondary },
-              ]}
-            >
-              {common.all}
-            </Text>
-          </TouchableOpacity>
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat._id}
-              onPress={() => setActiveCategory(cat.name)}
-              style={[
-                styles.categoryBtn,
-                activeCategory === cat.name && {
-                  backgroundColor: colors.primary,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.categoryText,
-                  activeCategory === cat.name
-                    ? { color: "white" }
-                    : { color: colors.secondary },
-                ]}
-              >
-                {cat.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+            Ombor Holati
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.viewTab,
+            activeView === "history" && styles.activeViewTab,
+          ]}
+          onPress={() => setActiveView("history")}
+        >
+          <MaterialCommunityIcons
+            name="history"
+            size={20}
+            color={activeView === "history" ? "white" : colors.secondary}
+          />
+          <Text
+            style={[
+              styles.viewTabText,
+              { color: activeView === "history" ? "white" : colors.secondary },
+            ]}
+          >
+            Chiqim Tarixi
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        <View style={styles.statsSection}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Bo'limlardagi qoldiqlar
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.statsScroll}
-          >
-            {stats.map((s) => {
-              const deptStock = allStaffStock.filter(
-                (st) => st.userId === s._id,
-              );
-              return (
-                <View
-                  key={s._id}
-                  style={[styles.statCard, { backgroundColor: colors.card }]}
+      {activeView === "status" ? (
+        <>
+          <View style={styles.searchContainer}>
+            <View
+              style={[
+                styles.searchBar,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="magnify"
+                size={20}
+                color={colors.secondary}
+              />
+              <TextInput
+                placeholder={t.searchPlaceholder}
+                placeholderTextColor={colors.secondary}
+                style={[styles.searchInput, { color: colors.text }]}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+          </View>
+
+          <View style={styles.categoryScroll}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryContainer}
+            >
+              <TouchableOpacity
+                onPress={() => setActiveCategory(common.all)}
+                style={[
+                  styles.categoryBtn,
+                  activeCategory === common.all && {
+                    backgroundColor: colors.primary,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.categoryText,
+                    activeCategory === common.all
+                      ? { color: "white" }
+                      : { color: colors.secondary },
+                  ]}
                 >
-                  <View style={styles.statHeader}>
-                    <Text style={[styles.statDept, { color: colors.accent }]}>
-                      {s._id.toUpperCase()}
-                    </Text>
+                  {common.all}
+                </Text>
+              </TouchableOpacity>
+              {categories.map((cat) => (
+                <TouchableOpacity
+                  key={cat._id}
+                  onPress={() => setActiveCategory(cat.name)}
+                  style={[
+                    styles.categoryBtn,
+                    activeCategory === cat.name && {
+                      backgroundColor: colors.primary,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      activeCategory === cat.name
+                        ? { color: "white" }
+                        : { color: colors.secondary },
+                    ]}
+                  >
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
+            <View style={styles.statsSection}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Bo'limlardagi qoldiqlar
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.statsScroll}
+                contentContainerStyle={{ paddingBottom: 10 }}
+              >
+                {stats.map((s) => {
+                  const deptStock = allStaffStock.filter(
+                    (st) => st.userId === s._id,
+                  );
+                  const lowStockCount = deptStock.filter(
+                    (i) => i.quantity < 1,
+                  ).length;
+
+                  return (
                     <View
+                      key={s._id}
                       style={[
-                        styles.itemCountBadge,
-                        { backgroundColor: colors.accent + "15" },
+                        styles.statCard,
+                        {
+                          backgroundColor: colors.card,
+                          shadowColor: colors.primary,
+                        },
                       ]}
                     >
+                      <View style={styles.statHeader}>
+                        <View style={styles.statTitleBox}>
+                          <MaterialCommunityIcons
+                            name={
+                              s._id === "oshpaz"
+                                ? "chef-hat"
+                                : s._id === "bar"
+                                  ? "glass-cocktail"
+                                  : "account-group"
+                            }
+                            size={20}
+                            color={colors.primary}
+                          />
+                          <Text
+                            style={[styles.statDept, { color: colors.text }]}
+                          >
+                            {s._id.toUpperCase()}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.itemCountBadge,
+                            {
+                              backgroundColor:
+                                lowStockCount > 0
+                                  ? colors.danger + "15"
+                                  : colors.primary + "10",
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.itemCountText,
+                              {
+                                color:
+                                  lowStockCount > 0
+                                    ? colors.danger
+                                    : colors.primary,
+                              },
+                            ]}
+                          >
+                            {lowStockCount > 0
+                              ? `${lowStockCount} ta kam`
+                              : `${deptStock.length} tur`}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.miniStockList}>
+                        {deptStock.slice(0, 5).map((st, idx) => (
+                          <View key={idx} style={styles.miniStockRow}>
+                            <Text
+                              style={[
+                                styles.miniStockText,
+                                { color: colors.secondary },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {st.productId?.name || "Noma'lum"}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.miniStockQty,
+                                {
+                                  color: getStockColor(st.quantity),
+                                  fontWeight: "bold",
+                                },
+                              ]}
+                            >
+                              {Number(st.quantity).toLocaleString(undefined, {
+                                maximumFractionDigits: 3,
+                              })}{" "}
+                              {st.productId?.unit || ""}
+                            </Text>
+                          </View>
+                        ))}
+                        {deptStock.length > 5 && (
+                          <TouchableOpacity style={{ marginTop: 8 }}>
+                            <Text
+                              style={{
+                                color: colors.primary,
+                                fontSize: 11,
+                                fontWeight: "600",
+                              }}
+                            >
+                              Yana {deptStock.length - 5} ta mahsulot...
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        {deptStock.length === 0 && (
+                          <View style={styles.emptyMiniStock}>
+                            <MaterialCommunityIcons
+                              name="package-variant"
+                              size={24}
+                              color={colors.border}
+                            />
+                            <Text
+                              style={{
+                                color: colors.secondary,
+                                fontSize: 12,
+                                marginTop: 4,
+                              }}
+                            >
+                              Bo'sh
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <View style={styles.statDivider} />
+                      <View style={styles.statFooter}>
+                        <View>
+                          <Text
+                            style={{ fontSize: 10, color: colors.secondary }}
+                          >
+                            Jami hajm
+                          </Text>
+                          <Text
+                            style={[
+                              styles.statVal,
+                              {
+                                color: colors.text,
+                                fontWeight: "bold",
+                                fontSize: 15,
+                              },
+                            ]}
+                          >
+                            {s.totalQuantity.toLocaleString()}
+                          </Text>
+                        </View>
+                        <MaterialCommunityIcons
+                          name="chevron-right"
+                          size={20}
+                          color={colors.border}
+                        />
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {loading ? (
+              <ActivityIndicator size="large" color={colors.primary} />
+            ) : filteredItems.length > 0 ? (
+              filteredItems.map((item) => (
+                <InventoryItem key={item._id} item={item} />
+              ))
+            ) : (
+              <View style={styles.emptyContainer}>
+                <MaterialCommunityIcons
+                  name="package-variant"
+                  size={64}
+                  color={colors.border}
+                />
+                <Text style={[styles.emptyText, { color: colors.secondary }]}>
+                  Hech narsa topilmadi
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.bottomSpace} />
+          </ScrollView>
+        </>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.historyContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {recentLogs.filter((log) => log.type === "OUT").length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <MaterialCommunityIcons
+                name="history"
+                size={48}
+                color={colors.secondary + "40"}
+              />
+              <Text style={[styles.emptyText, { color: colors.secondary }]}>
+                Hozircha chiqim tarixi yo'q
+              </Text>
+            </View>
+          ) : (
+            recentLogs
+              .filter((log) => log.type === "OUT")
+              .map((log) => (
+                <View
+                  key={log._id}
+                  style={[styles.logCard, { backgroundColor: colors.card }]}
+                >
+                  <View
+                    style={[
+                      styles.logIcon,
+                      { backgroundColor: colors.accent + "15" },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="arrow-down-bold-outline"
+                      size={24}
+                      color={colors.accent}
+                    />
+                  </View>
+                  <View style={styles.logBody}>
+                    <View style={styles.logHeader}>
+                      <Text style={[styles.logProduct, { color: colors.text }]}>
+                        {log.productId?.name || "Noma'lum"}
+                      </Text>
+                      <Text style={[styles.logQty, { color: colors.accent }]}>
+                        -
+                        {log.quantity.toLocaleString(undefined, {
+                          maximumFractionDigits: 3,
+                        })}{" "}
+                        {log.productId?.unit}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[styles.logReason, { color: colors.secondary }]}
+                      numberOfLines={1}
+                    >
+                      {log.reason || "Sabab ko'rsatilmagan"}
+                    </Text>
+                    <View style={styles.logFooter}>
+                      <Text style={[styles.logUser, { color: colors.primary }]}>
+                        <MaterialCommunityIcons
+                          name="account-group"
+                          size={12}
+                        />{" "}
+                        {log.fromUser || log.department || "Xodim"}
+                      </Text>
                       <Text
-                        style={[styles.itemCountText, { color: colors.accent }]}
+                        style={[styles.logTime, { color: colors.secondary }]}
                       >
-                        {deptStock.length} ta tur
+                        {new Date(log.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        | {new Date(log.createdAt).toLocaleDateString()}
                       </Text>
                     </View>
                   </View>
-
-                  <View style={styles.miniStockList}>
-                    {deptStock.slice(0, 8).map((st, idx) => (
-                      <View key={idx} style={styles.miniStockRow}>
-                        <Text
-                          style={[styles.miniStockText, { color: colors.text }]}
-                          numberOfLines={1}
-                        >
-                          • {st.productId?.name || "Noma'lum"}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.miniStockQty,
-                            { color: getStockColor(st.quantity) },
-                          ]}
-                        >
-                          {st.quantity} {st.productId?.unit || ""}
-                        </Text>
-                      </View>
-                    ))}
-                    {deptStock.length > 8 && (
-                      <Text
-                        style={[
-                          styles.miniStockText,
-                          {
-                            color: colors.secondary,
-                            fontSize: 10,
-                            marginTop: 4,
-                          },
-                        ]}
-                      >
-                        +{deptStock.length - 8} yana...
-                      </Text>
-                    )}
-                    {deptStock.length === 0 && (
-                      <Text
-                        style={[
-                          styles.miniStockText,
-                          { color: colors.secondary, fontStyle: "italic" },
-                        ]}
-                      >
-                        Hozircha bo'sh
-                      </Text>
-                    )}
-                  </View>
-
-                  <View style={styles.statDivider} />
-                  <View style={styles.statFooter}>
-                    <Text
-                      style={[
-                        styles.statVal,
-                        { color: getStockColor(s.totalQuantity) },
-                      ]}
-                    >
-                      Jami hajm: {s.totalQuantity.toLocaleString()}
-                    </Text>
-                  </View>
                 </View>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} />
-        ) : filteredItems.length > 0 ? (
-          filteredItems.map((item) => (
-            <InventoryItem key={item._id} item={item} />
-          ))
-        ) : (
-          <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons
-              name="package-variant"
-              size={64}
-              color={colors.border}
-            />
-            <Text style={[styles.emptyText, { color: colors.secondary }]}>
-              Hech narsa topilmadi
-            </Text>
-          </View>
-        )}
-
-        {recentLogs.length > 0 && (
-          <View style={styles.logsSection}>
-            <Text
-              style={[
-                styles.sectionTitle,
-                { color: colors.text, marginTop: 20 },
-              ]}
-            >
-              So'nggi amallar
-            </Text>
-            {recentLogs.map((log) => (
-              <View
-                key={log._id}
-                style={[styles.logRow, { backgroundColor: colors.card }]}
-              >
-                <View
-                  style={[
-                    styles.logIcon,
-                    { backgroundColor: colors.accent + "15" },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name="arrow-up-right"
-                    size={20}
-                    color={colors.accent}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.logText, { color: colors.text }]}>
-                    <Text style={{ fontWeight: "bold" }}>
-                      {log.productId?.name}
-                    </Text>{" "}
-                    {"->"} {log.department}
-                  </Text>
-                  <Text style={[styles.logTime, { color: colors.secondary }]}>
-                    {new Date(log.date).toLocaleString("uz-UZ", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      day: "2-digit",
-                      month: "short",
-                    })}
-                  </Text>
-                </View>
-                <Text style={[styles.logQty, { color: colors.danger }]}>
-                  -{log.quantity} {log.productId?.unit}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-        <View style={styles.bottomSpace} />
-      </ScrollView>
+              ))
+          )}
+          <View style={styles.bottomSpace} />
+        </ScrollView>
+      )}
 
       {/* Distribution Modal */}
       <Modal visible={distributeModal} transparent animationType="slide">
@@ -900,56 +1054,61 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10 },
   statsScroll: { gap: 10 },
   statCard: {
+    width: 240,
+    borderRadius: 24,
     padding: 16,
-    borderRadius: 20,
-    marginRight: 12,
-    width: 200,
+    marginRight: 16,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   statHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    width: "100%",
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  statTitleBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   itemCountBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 10,
   },
-  itemCountText: {
-    fontSize: 10,
-    fontWeight: "bold",
-  },
-  statDept: {
-    fontSize: 14,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-  },
-  miniStockList: { width: "100%", gap: 4, minHeight: 80 },
+  itemCountText: { fontSize: 11, fontWeight: "bold" },
+  statDept: { fontSize: 14, fontWeight: "bold", letterSpacing: 0.5 },
+  miniStockList: { gap: 8, height: 160 },
   miniStockRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  miniStockText: { fontSize: 12, fontWeight: "500", flex: 1 },
-  miniStockQty: { fontSize: 11, fontWeight: "600" },
+  miniStockText: { fontSize: 13, flex: 1, marginRight: 8 },
+  miniStockQty: { fontSize: 13 },
+  emptyMiniStock: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    opacity: 0.5,
+  },
   statDivider: {
     height: 1,
-    width: "100%",
     backgroundColor: "rgba(0,0,0,0.05)",
-    marginVertical: 10,
+    marginVertical: 12,
   },
   statFooter: {
-    width: "100%",
-    alignItems: "flex-end",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  statVal: { fontSize: 13, fontWeight: "bold" },
+  statVal: { fontSize: 14 },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -1006,22 +1165,80 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logsSection: { marginTop: 10 },
-  logRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 8,
-    gap: 12,
+  notificationBadge: {
+    position: "absolute",
+    top: 10,
+    right: 15,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#EF4444",
+    borderWidth: 1,
+    borderColor: "white",
   },
+  viewTabs: {
+    flexDirection: "row",
+    backgroundColor: "#F1F5F9",
+    padding: 6,
+    borderRadius: 16,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    marginTop: 10,
+  },
+  viewTab: {
+    flex: 1,
+    flexDirection: "row",
+    paddingVertical: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 12,
+    gap: 8,
+  },
+  activeViewTab: {
+    backgroundColor: "#2563EB",
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  viewTabText: { fontSize: 13, fontWeight: "600" },
+  historyContainer: { paddingVertical: 20, paddingHorizontal: 20 },
+  logCard: {
+    flexDirection: "row",
+    padding: 15,
+    borderRadius: 18,
+    alignItems: "center",
+    gap: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+    marginBottom: 12,
+  },
+  logBody: { flex: 1, gap: 4 },
+  logHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  logProduct: { fontSize: 15, fontWeight: "bold" },
+  logFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  logUser: { fontSize: 11, fontWeight: "600" },
   logIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
   },
-  logText: { fontSize: 14 },
   logTime: { fontSize: 11, marginTop: 2 },
   logQty: { fontSize: 14, fontWeight: "bold" },
+  logReason: { fontSize: 13 },
 });
