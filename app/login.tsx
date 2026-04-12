@@ -110,12 +110,13 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.flex}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <View style={styles.headerContainer}>
             <View style={styles.logoIconContainer}>
@@ -157,6 +158,8 @@ export default function LoginScreen() {
                   onFocus={() => setIsPhoneFocused(true)}
                   onBlur={() => setIsPhoneFocused(false)}
                   autoCapitalize="none"
+                  autoComplete="tel"
+                  textContentType="telephoneNumber"
                   maxLength={17}
                 />
               </View>
@@ -187,6 +190,8 @@ export default function LoginScreen() {
                   onChangeText={setPassword}
                   onFocus={() => setIsPasswordFocused(true)}
                   onBlur={() => setIsPasswordFocused(false)}
+                  autoComplete="password"
+                  textContentType="password"
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
@@ -226,15 +231,18 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.footer}>
+            <TouchableOpacity
+              onPress={() => router.push("/privacy-policy")}
+              style={{ marginBottom: 20 }}
+            >
+              <Text
+                style={[styles.demoEmail, { textDecorationLine: "underline" }]}
+              >
+                {Translations.uz.profile.privacyPolicy}
+              </Text>
+            </TouchableOpacity>
             <Text style={styles.footerText}>{t.demoAccounts}</Text>
-            <View style={styles.demoRow}>
-              <Text style={styles.demoType}>{t.owner}:</Text>
-              <Text style={styles.demoEmail}>+998700134501 / 12345678</Text>
-            </View>
-            <View style={styles.demoRow}>
-              <Text style={styles.demoType}>{t.waiter}:</Text>
-              <Text style={styles.demoEmail}>+998921234573 / password123</Text>
-            </View>
+            
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -253,7 +261,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     padding: 24,
-    justifyContent: "center",
+    paddingTop: Platform.OS === "android" ? 60 : 40,
+    paddingBottom: 150,
   },
   headerContainer: {
     alignItems: "center",

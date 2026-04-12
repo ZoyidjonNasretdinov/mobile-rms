@@ -205,6 +205,16 @@ export const Translations = {
       selectMethod: "To'lov usulini tanlang",
       searchTable: "Stolni qidirish...",
     },
+    profile: {
+      title: "Profil sozlamalari",
+      logout: "Tizimdan chiqish",
+      deleteAccount: "Hisobni o'chirish",
+      privacyPolicy: "Maxfiylik siyosati",
+      confirmDelete:
+        "Hisobingizni o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.",
+      deleteSuccess: "Hisob o'chirildi",
+      logoutSuccess: "Tizimdan chiqildi",
+    },
   },
 };
 

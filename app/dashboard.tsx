@@ -219,11 +219,14 @@ export default function DashboardScreen() {
             {t.title}
           </Text>
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity
+          style={styles.profileButton}
+          onPress={() => router.push("/profile")}
+        >
           <MaterialCommunityIcons
-            name="logout"
-            size={24}
-            color={colors.secondary}
+            name="account-circle-outline"
+            size={28}
+            color={colors.primary}
           />
         </TouchableOpacity>
       </View>
@@ -494,5 +497,10 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  profileButton: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: Colors.light.primary + "10",
   },
 });

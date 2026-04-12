@@ -11,7 +11,9 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.rms.app",
+      "package": "com.rms.smart.boshqaruv",
+      "versionCode": 2,
+      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE", "VIBRATE"],
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/logo.png"
@@ -37,10 +39,6 @@
       ],
       "expo-secure-store"
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
     "extra": {
       "router": {},
       "eas": {
