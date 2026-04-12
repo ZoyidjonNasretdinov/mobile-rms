@@ -9,7 +9,8 @@ class SocketService {
   connect() {
     if (!this.socket) {
       this.socket = io(SOCKET_URL, {
-        transports: ["websocket"], // High-speed direct websocket transport
+        transports: ["polling", "websocket"],
+        reconnectionAttempts: 5,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
       });

@@ -34,6 +34,7 @@ export default function DashboardScreen() {
   });
   const [revenue, setRevenue] = useState(0);
   const [orderCount, setOrderCount] = useState(0);
+  const [stockStats, setStockStats] = useState({ low: 0, total: 0 });
   const [role, setRole] = useState("");
   const [activeShift, setActiveShift] = useState<any>(null);
   const [isShiftActive, setIsShiftActive] = useState(false);
@@ -55,17 +56,20 @@ export default function DashboardScreen() {
         if (userRole === "kassier") router.replace("/cashier");
       }
 
-      // Load staff stats
+      // Load stats
       try {
         const token = await Storage.getItem("access_token");
-        const response = await axios.get(`${CONFIG.API_BASE_URL}/users`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const headers = { Authorization: `Bearer ${token}` };
+
+        // 1. Staff stats
+        const usersRes = await axios.get(`${CONFIG.API_BASE_URL}/users`, {
+          headers,
         });
-        const staff = response.data;
+        const staff = usersRes.data;
         const active = staff.filter((s: any) => s.isActive).length;
         setActiveStaffCount({ active, total: staff.length });
 
-        // Load revenue and order stats for TODAY
+        // 2. Revenue and order stats for TODAY
         const now = new Date();
         const startOfDay = new Date(
           now.getFullYear(),
@@ -83,12 +87,21 @@ export default function DashboardScreen() {
 
         const statsRes = await axios.get(
           `${CONFIG.API_BASE_URL}/orders/stats?startDate=${startOfDay}&endDate=${endOfDay}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
+          { headers },
         );
         setRevenue(statsRes.data.totalRevenue);
         setOrderCount(statsRes.data.totalOrderCount);
+
+        // 3. Inventory stats
+        const productsRes = await axios.get(
+          `${CONFIG.API_BASE_URL}/inventory/products`,
+          { headers },
+        );
+        const products = productsRes.data;
+        const lowStock = products.filter(
+          (p: any) => p.currentStock <= (p.minThreshold || 0),
+        ).length;
+        setStockStats({ low: lowStock, total: products.length });
       } catch (error) {
         console.error("Dashboard fetch error:", error);
       }
@@ -102,11 +115,17 @@ export default function DashboardScreen() {
     socket.on("orderCreated", handleUpdate);
     socket.on("orderUpdated", handleUpdate);
     socket.on("staffStatusChanged", handleUpdate);
+    socket.on("stockUpdated", handleUpdate);
+    socket.on("staffStockUpdated", handleUpdate);
+    socket.on("transferUpdated", handleUpdate);
 
     return () => {
       socket.off("orderCreated", handleUpdate);
       socket.off("orderUpdated", handleUpdate);
       socket.off("staffStatusChanged", handleUpdate);
+      socket.off("stockUpdated", handleUpdate);
+      socket.off("staffStockUpdated", handleUpdate);
+      socket.off("transferUpdated", handleUpdate);
     };
   }, []);
 
@@ -216,7 +235,43 @@ export default function DashboardScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           {t.performance}
         </Text>
-        <View style={styles.perfGrid}></View>
+        <View style={styles.perfGrid}>
+          <PerformanceCard
+            title={t.revenue}
+            value={`${revenue.toLocaleString()} ${Translations.uz.common.currency}`}
+            change="+12%"
+            icon="bank-transfer"
+            iconColor="#10B981"
+            bgColor="#10B98115"
+          />
+          <PerformanceCard
+            title={t.orders}
+            value={orderCount.toString()}
+            change="+8%"
+            icon="clipboard-list"
+            iconColor="#3B82F6"
+            bgColor="#3B82F615"
+            onPress={() => router.push("/orders")}
+          />
+          <PerformanceCard
+            title={t.staffOnDuty}
+            value={`${activeStaffCount.active}/${activeStaffCount.total}`}
+            change={t.now}
+            icon="account-group-outline"
+            iconColor="#8B5CF6"
+            bgColor="#8B5CF615"
+            onPress={() => router.push("/staff")}
+          />
+          <PerformanceCard
+            title={t.stockLevel}
+            value={stockStats.total.toString()}
+            change={stockStats.low > 0 ? `${stockStats.low} kam` : "Normal"}
+            icon="cube-outline"
+            iconColor={stockStats.low > 0 ? "#EF4444" : "#F59E0B"}
+            bgColor={stockStats.low > 0 ? "#EF444415" : "#F59E0B15"}
+            onPress={() => router.push("/inventory")}
+          />
+        </View>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           {t.quickActions}
