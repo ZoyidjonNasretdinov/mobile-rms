@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -14,14 +14,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Translations } from "@/constants/translations";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
 import { socketService } from "@/utils/socket";
-import { useFocusEffect } from "expo-router";
-import { useCallback } from "react";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
 const common = Translations.uz.common;

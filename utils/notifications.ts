@@ -1,12 +1,19 @@
-import { Audio } from "expo-av";
+import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from "expo-audio";
 import * as Speech from "expo-speech";
 import * as Haptics from "expo-haptics";
+import { Platform } from "react-native";
 
-const NOTIFICATION_SOUND_URI =
+const DING_SOUND_URI =
   "https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3";
+const ALARM_SOUND_URI =
+  "https://assets.mixkit.co/active_storage/sfx/2569/2569-preview.mp3";
+const KITCHEN_SOUND_URI =
+  "https://assets.mixkit.co/active_storage/sfx/2857/2857-preview.mp3";
 
 class NotificationService {
-  private sound: Audio.Sound | null = null;
+  private dingPlayer: AudioPlayer | null = null;
+  private alarmPlayer: AudioPlayer | null = null;
+  private kitchenPlayer: AudioPlayer | null = null;
   private isReady: boolean = false;
 
   constructor() {
@@ -14,21 +21,25 @@ class NotificationService {
   }
 
   private async prepareAudio() {
+    // Avoid running on server-side during web static generation
+    if (Platform.OS === "web" && typeof window === "undefined") {
+      return;
+    }
+
     try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        playThroughEarpieceAndroid: false,
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: true,
+        interruptionMode: "mixWithOthers",
       });
 
-      // Pre-load the sound
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: NOTIFICATION_SOUND_URI },
-        { shouldPlay: false, volume: 1.0 },
-      );
-      this.sound = sound;
+      // Pre-load sounds using expo-audio players
+      this.dingPlayer = createAudioPlayer(DING_SOUND_URI);
+      this.alarmPlayer = createAudioPlayer(ALARM_SOUND_URI);
+      this.kitchenPlayer = createAudioPlayer(KITCHEN_SOUND_URI);
+
       this.isReady = true;
-      console.log("Notification sound pre-loaded");
+      console.log("Notification players initialized");
     } catch (e) {
       console.log("Audio prepare error:", e);
     }
@@ -36,20 +47,52 @@ class NotificationService {
 
   async playDing() {
     try {
-      if (this.sound && this.isReady) {
-        await this.sound.stopAsync();
-        await this.sound.playFromPositionAsync(0);
-      } else {
-        // Fallback or retry pre-load
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: NOTIFICATION_SOUND_URI },
-          { shouldPlay: true, volume: 1.0 },
-        );
-        this.sound = sound;
-        this.isReady = true;
+      if (this.dingPlayer) {
+        // In expo-audio, seekTo is in seconds
+        await (this.dingPlayer as any).seekTo(0);
+        (this.dingPlayer as any).play();
+      } else if (!this.isReady) {
+        // Lazy initialization if not ready
+        await this.prepareAudio();
+        if (this.dingPlayer) {
+          (this.dingPlayer as any).play();
+        }
       }
     } catch (error) {
       console.log("Error playing ding:", error);
+    }
+  }
+
+  async playAlarm() {
+    try {
+      if (this.alarmPlayer) {
+        await (this.alarmPlayer as any).seekTo(0);
+        (this.alarmPlayer as any).play();
+      } else if (!this.isReady) {
+        // Lazy initialization if not ready
+        await this.prepareAudio();
+        if (this.alarmPlayer) {
+          (this.alarmPlayer as any).play();
+        }
+      }
+    } catch (error) {
+      console.log("Error playing alarm:", error);
+    }
+  }
+
+  async playKitchen() {
+    try {
+      if (this.kitchenPlayer) {
+        await (this.kitchenPlayer as any).seekTo(0);
+        (this.kitchenPlayer as any).play();
+      } else if (!this.isReady) {
+        await this.prepareAudio();
+        if (this.kitchenPlayer) {
+          (this.kitchenPlayer as any).play();
+        }
+      }
+    } catch (error) {
+      console.log("Error playing kitchen sound:", error);
     }
   }
 
@@ -57,6 +100,7 @@ class NotificationService {
     message: string,
     hapticType: Haptics.NotificationFeedbackType = Haptics
       .NotificationFeedbackType.Success,
+    soundType: "ding" | "alarm" | "kitchen" = "ding",
   ) {
     // 1. Haptics
     try {
@@ -64,10 +108,15 @@ class NotificationService {
     } catch (e) {}
 
     // 2. Sound
-    await this.playDing();
+    if (soundType === "alarm") {
+      await this.playAlarm();
+    } else if (soundType === "kitchen") {
+      await this.playKitchen();
+    } else {
+      await this.playDing();
+    }
 
     // 3. Speech
-    // We wait slightly for the ding to finish or be clearly heard
     setTimeout(() => {
       Speech.speak(message, {
         language: "uz-UZ",

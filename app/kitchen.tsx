@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Alert,
   Dimensions,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -23,7 +24,6 @@ import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { notificationService } from "@/utils/notifications";
 import {
-  GestureHandlerRootView,
   Gesture,
   GestureDetector,
   TouchableOpacity as GHTouchableOpacity,
@@ -54,7 +54,7 @@ interface SwipeableItemProps {
 const safeHaptics = async (type: Haptics.NotificationFeedbackType) => {
   try {
     await Haptics.notificationAsync(type);
-  } catch (e) {
+  } catch {
     // Ignore haptics error on web/unsupported
   }
 };
@@ -74,7 +74,7 @@ const SwipeableItem = ({
   // Reset swipe position when item or status changes
   useEffect(() => {
     translateX.value = withSpring(0);
-  }, [item._id, status]);
+  }, [item._id, status, translateX]);
 
   const canSwipeRight = status !== "Ready";
   const canSwipeLeft = status !== "Pending";
@@ -103,23 +103,8 @@ const SwipeableItem = ({
     });
 
   const rStyle = useAnimatedStyle(() => {
-    // Wave-like effect: rotate and skew based on swipe
-    const rotate = interpolate(
-      translateX.value,
-      [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-      [-2, 0, 2],
-    );
-    const skew = interpolate(
-      translateX.value,
-      [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-      [-1, 0, 1],
-    );
     return {
-      transform: [
-        { translateX: translateX.value },
-        { rotate: `${rotate}deg` },
-        { skewX: `${skew}deg` },
-      ],
+      transform: [{ translateX: translateX.value }],
       // Border color pulse
       borderColor: interpolateColor(
         Math.abs(translateX.value),
@@ -131,49 +116,21 @@ const SwipeableItem = ({
   });
 
   const rIconLeftStyle = useAnimatedStyle(() => ({
-    opacity:
-      canSwipeRight && translateX.value > 5
-        ? Math.min(translateX.value / 40, 1)
-        : 0,
-    transform: [
-      {
-        scale: withSpring(translateX.value > 30 ? 1.2 : 0.8, {
-          damping: 12,
-          stiffness: 90,
-        }),
-      },
-      {
-        translateX: interpolate(
-          translateX.value,
-          [0, SWIPE_THRESHOLD],
-          [-20, 0],
-          "clamp",
-        ),
-      },
-    ],
+    opacity: interpolate(
+      translateX.value,
+      [0, SWIPE_THRESHOLD / 2],
+      [0, 1],
+      "clamp",
+    ),
   }));
 
   const rIconRightStyle = useAnimatedStyle(() => ({
-    opacity:
-      canSwipeLeft && translateX.value < -5
-        ? Math.min(Math.abs(translateX.value) / 40, 1)
-        : 0,
-    transform: [
-      {
-        scale: withSpring(translateX.value < -30 ? 1.2 : 0.8, {
-          damping: 12,
-          stiffness: 90,
-        }),
-      },
-      {
-        translateX: interpolate(
-          translateX.value,
-          [-SWIPE_THRESHOLD, 0],
-          [0, 20],
-          "clamp",
-        ),
-      },
-    ],
+    opacity: interpolate(
+      translateX.value,
+      [-SWIPE_THRESHOLD / 2, 0],
+      [1, 0],
+      "clamp",
+    ),
   }));
 
   const config = (() => {
@@ -197,13 +154,13 @@ const SwipeableItem = ({
         style={[
           styles.swipeBack,
           rIconLeftStyle,
-          { backgroundColor: colors.success + "25" },
+          { backgroundColor: "#10B981" }, // Solid green
         ]}
       >
         <MaterialCommunityIcons
           name="arrow-right-bold"
           size={32}
-          color={colors.success}
+          color="white"
         />
       </Animated.View>
       <Animated.View
@@ -211,13 +168,13 @@ const SwipeableItem = ({
           styles.swipeBack,
           styles.swipeBackRight,
           rIconRightStyle,
-          { backgroundColor: colors.danger + "25" },
+          { backgroundColor: "#EF4444" }, // Solid red
         ]}
       >
         <MaterialCommunityIcons
           name="arrow-left-bold"
           size={32}
-          color={colors.danger}
+          color="white"
         />
       </Animated.View>
 
@@ -394,6 +351,7 @@ export default function KitchenScreen() {
   const [orders, setOrders] = useState<any[]>([]);
   const [pendingTransfers, setPendingTransfers] = useState<any[]>([]);
   const [myStock, setMyStock] = useState<any[]>([]);
+  const [inventorySearch, setInventorySearch] = useState("");
   const [user, setUser] = useState<any>(null);
   const userRef = useRef<any>(null);
 
@@ -449,8 +407,8 @@ export default function KitchenScreen() {
           .filter(Boolean);
         setOrders(filtered);
       }
-    } catch (error) {
-      console.error("Kitchen fetch error:", error);
+    } catch {
+      console.error("Kitchen fetch error:");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -475,8 +433,8 @@ export default function KitchenScreen() {
 
       setPendingTransfers(transfersRes.data);
       setMyStock(stockRes.data);
-    } catch (error) {
-      console.error("Inventory fetch error:", error);
+    } catch {
+      console.error("Inventory fetch error:");
     }
   };
 
@@ -493,7 +451,7 @@ export default function KitchenScreen() {
         status === "ACCEPTED" ? "Qabul qilindi" : "Rad etildi",
       );
       fetchInventory();
-    } catch (error) {
+    } catch {
       Alert.alert("Xato", "Amalni bajarib bo'lmadi");
     }
   };
@@ -536,8 +494,15 @@ export default function KitchenScreen() {
         notificationService.notify(
           "Yangi buyurtma tushdi!",
           Haptics.NotificationFeedbackType.Success,
+          "kitchen",
         );
-        Speech.speak("Yangi buyurtma", { language: "uz-UZ" });
+        const roleGreeting =
+          currentUser?.role === "shashlikchi"
+            ? "Shashlikchi"
+            : currentUser?.role === "bar"
+              ? "Barmen"
+              : "Oshpaz";
+        Speech.speak(`${roleGreeting}, yangi buyurtma`, { language: "uz-UZ" });
       }
     });
 
@@ -571,14 +536,32 @@ export default function KitchenScreen() {
             notificationService.notify(
               "Buyurtma yangilandi!",
               Haptics.NotificationFeedbackType.Warning,
+              "kitchen",
             );
-            Speech.speak("Buyurtma yangilandi", { language: "uz-UZ" });
+            const roleGreeting =
+              currentUser?.role === "shashlikchi"
+                ? "Shashlikchi"
+                : currentUser?.role === "bar"
+                  ? "Barmen"
+                  : "Oshpaz";
+            Speech.speak(`${roleGreeting}, buyurtma yangilandi`, {
+              language: "uz-UZ",
+            });
           } else if (!isExisting) {
             notificationService.notify(
               "Yangi buyurtma (yangilanish)!",
               Haptics.NotificationFeedbackType.Success,
+              "kitchen",
             );
-            Speech.speak("Yangi buyurtma", { language: "uz-UZ" });
+            const roleGreeting =
+              currentUser?.role === "shashlikchi"
+                ? "Shashlikchi"
+                : currentUser?.role === "bar"
+                  ? "Barmen"
+                  : "Oshpaz";
+            Speech.speak(`${roleGreeting}, yangi buyurtma`, {
+              language: "uz-UZ",
+            });
           }
 
           if (isExisting) {
@@ -638,6 +621,9 @@ export default function KitchenScreen() {
       fetchInventory();
     });
 
+    socket.on("stockUpdated", fetchInventory);
+    socket.on("staffStockUpdated", fetchInventory);
+
     return () => {
       socket.off("orderCreated");
       socket.off("orderUpdated");
@@ -669,8 +655,8 @@ export default function KitchenScreen() {
       );
       // Fallback refetch to ensure UI updates even if socket is slow
       fetchOrders();
-    } catch (error) {
-      console.error("Status update error:", error);
+    } catch {
+      console.error("Status update error:");
       Alert.alert("Xatolik", "Statusni yangilab bo'lmadi");
     }
   };
@@ -952,6 +938,35 @@ export default function KitchenScreen() {
             )}
 
             <View style={styles.section}>
+              <View
+                style={[
+                  styles.searchBar,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="magnify"
+                  size={20}
+                  color={colors.secondary}
+                />
+                <TextInput
+                  style={[styles.searchInput, { color: colors.text }]}
+                  placeholder="Mahsulotlarni qidirish..."
+                  placeholderTextColor={colors.secondary}
+                  value={inventorySearch}
+                  onChangeText={setInventorySearch}
+                />
+                {inventorySearch !== "" && (
+                  <TouchableOpacity onPress={() => setInventorySearch("")}>
+                    <MaterialCommunityIcons
+                      name="close-circle"
+                      size={20}
+                      color={colors.secondary}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>
                   Mavjud qoldiq
@@ -969,12 +984,23 @@ export default function KitchenScreen() {
                       fontSize: 12,
                     }}
                   >
-                    {myStock.length} tur
+                    {
+                      myStock.filter((s) =>
+                        s.productId?.name
+                          ?.toLowerCase()
+                          .includes(inventorySearch.toLowerCase()),
+                      ).length
+                    }{" "}
+                    tur
                   </Text>
                 </View>
               </View>
 
-              {myStock.length === 0 ? (
+              {myStock.filter((s) =>
+                s.productId?.name
+                  ?.toLowerCase()
+                  .includes(inventorySearch.toLowerCase()),
+              ).length === 0 ? (
                 <View
                   style={[styles.emptyCard, { backgroundColor: colors.card }]}
                 >
@@ -990,85 +1016,97 @@ export default function KitchenScreen() {
                       marginTop: 10,
                     }}
                   >
-                    Hozircha omborda mahsulot yo'q
+                    {inventorySearch === ""
+                      ? "Hozircha omborda mahsulot yo'q"
+                      : "Qidiruv bo'yicha mahsulot topilmadi"}
                   </Text>
                 </View>
               ) : (
                 <View style={styles.stockGrid}>
-                  {myStock.map((s) => {
-                    const isLow = s.quantity < 1; // Example low stock threshold
-                    return (
-                      <View
-                        key={s._id}
-                        style={[
-                          styles.stockGridItem,
-                          {
-                            backgroundColor: colors.card,
-                            borderColor: isLow
-                              ? colors.danger + "30"
-                              : colors.border + "50",
-                          },
-                        ]}
-                      >
+                  {myStock
+                    .filter((s) =>
+                      s.productId?.name
+                        ?.toLowerCase()
+                        .includes(inventorySearch.toLowerCase()),
+                    )
+                    .map((s) => {
+                      const minThreshold = s.productId?.minThreshold || 0;
+                      const isLow = s.quantity < minThreshold;
+                      return (
                         <View
+                          key={s._id}
                           style={[
-                            styles.stockIconBox,
+                            styles.stockGridItem,
                             {
-                              backgroundColor: isLow
-                                ? colors.danger + "10"
-                                : colors.primary + "05",
+                              backgroundColor: colors.card,
+                              borderColor: isLow
+                                ? colors.danger + "30"
+                                : colors.border + "50",
                             },
                           ]}
                         >
-                          <MaterialCommunityIcons
-                            name={
-                              isLow
-                                ? "alert-circle-outline"
-                                : "package-variant-closed"
-                            }
-                            size={20}
-                            color={isLow ? colors.danger : colors.primary}
-                          />
-                        </View>
-                        <Text
-                          style={[styles.stockGridName, { color: colors.text }]}
-                          numberOfLines={1}
-                        >
-                          {s.productId?.name}
-                        </Text>
-                        <View style={styles.stockGridFooter}>
-                          <Text
-                            style={[
-                              styles.stockGridQty,
-                              { color: isLow ? colors.danger : colors.text },
-                            ]}
-                          >
-                            {Number(s.quantity).toLocaleString(undefined, {
-                              maximumFractionDigits: 3,
-                            })}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.stockGridUnit,
-                              { color: colors.secondary },
-                            ]}
-                          >
-                            {s.productId?.unit}
-                          </Text>
-                        </View>
-                        {isLow && (
                           <View
                             style={[
-                              styles.lowStockTag,
-                              { backgroundColor: colors.danger },
+                              styles.stockIconBox,
+                              {
+                                backgroundColor: isLow
+                                  ? colors.danger + "10"
+                                  : colors.primary + "05",
+                              },
                             ]}
                           >
-                            <Text style={styles.lowStockText}>KAM</Text>
+                            <MaterialCommunityIcons
+                              name={
+                                isLow
+                                  ? "alert-circle-outline"
+                                  : "package-variant-closed"
+                              }
+                              size={20}
+                              color={isLow ? colors.danger : colors.primary}
+                            />
                           </View>
-                        )}
-                      </View>
-                    );
-                  })}
+                          <Text
+                            style={[
+                              styles.stockGridName,
+                              { color: colors.text },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {s.productId?.name}
+                          </Text>
+                          <View style={styles.stockGridFooter}>
+                            <Text
+                              style={[
+                                styles.stockGridQty,
+                                { color: isLow ? colors.danger : colors.text },
+                              ]}
+                            >
+                              {Number(s.quantity).toLocaleString(undefined, {
+                                maximumFractionDigits: 3,
+                              })}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.stockGridUnit,
+                                { color: colors.secondary },
+                              ]}
+                            >
+                              {s.productId?.unit}
+                            </Text>
+                          </View>
+                          {isLow && (
+                            <View
+                              style={[
+                                styles.lowStockTag,
+                                { backgroundColor: colors.danger },
+                              ]}
+                            >
+                              <Text style={styles.lowStockText}>KAM</Text>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
                 </View>
               )}
             </View>
@@ -1094,7 +1132,7 @@ export default function KitchenScreen() {
                   color={colors.secondary + "40"}
                 />
                 <Text style={[styles.emptyText, { color: colors.secondary }]}>
-                  Hozircha malumot yo'q
+                  Hozircha malumot yo&apos;q
                 </Text>
               </View>
             ) : (
@@ -1152,6 +1190,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 54,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  searchInput: { flex: 1, marginLeft: 12, fontSize: 16, fontWeight: "500" },
   headerInfo: {
     flexDirection: "row",
     alignItems: "center",

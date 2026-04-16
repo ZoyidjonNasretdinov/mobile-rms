@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -18,9 +18,8 @@ import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
 import { socketService } from "@/utils/socket";
-import * as Speech from "expo-speech";
+// import * as Speech from "expo-speech";
 import * as Haptics from "expo-haptics";
-import { useRef } from "react";
 import { notificationService } from "@/utils/notifications";
 
 import { Translations } from "@/constants/translations";
@@ -47,7 +46,7 @@ export default function WaiterStationScreen() {
   const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
   const [isShiftActive, setIsShiftActive] = useState(true); // Default to true to avoid flicker
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const token = await Storage.getItem("access_token");
       const userStr = await Storage.getItem("user");
@@ -113,7 +112,7 @@ export default function WaiterStationScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [selectedFloor]);
 
   useEffect(() => {
     fetchData();
@@ -138,6 +137,7 @@ export default function WaiterStationScreen() {
         notificationService.notify(
           msg,
           Haptics.NotificationFeedbackType.Success,
+          "alarm",
         );
 
         setNotifications((prev) =>
@@ -169,6 +169,10 @@ export default function WaiterStationScreen() {
       if (!data.waiterId || data.waiterId === currentUserId) {
         const floorStr = data.floor ? `${data.floor}-qavat, ` : "";
         const msg = `${floorStr}${data.tableName}-stol: ${data.itemName} jarayonga o'tkazildi 🍳`;
+        notificationService.notify(
+          msg,
+          Haptics.NotificationFeedbackType.Warning,
+        );
         setNotifications((prev) =>
           [
             {
@@ -271,7 +275,7 @@ export default function WaiterStationScreen() {
       socket.off("orderPaid");
       socket.off("tableUpdated");
     };
-  }, []);
+  }, [fetchData, colors.primary, colors.success, colors.warning]);
 
   const handleLogout = async () => {
     await Storage.removeItem("access_token");
@@ -654,7 +658,7 @@ export default function WaiterStationScreen() {
             color="white"
           />
           <Text style={{ color: "white", fontWeight: "bold", fontSize: 13 }}>
-            Ish kuni boshlanmagan. Zakaz berib bo'lmaydi.
+            {"Ish kuni boshlanmagan. Zakaz berib bo'lmaydi."}
           </Text>
         </View>
       )}

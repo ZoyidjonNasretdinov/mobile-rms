@@ -38,22 +38,34 @@ export default function CreateOrderScreen() {
   const [originalQuantities, setOriginalQuantities] = useState<{
     [key: string]: number;
   }>({});
+  const [availability, setAvailability] = useState<
+    Record<string, { available: boolean; missing: string[] }>
+  >({});
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const token = await Storage.getItem("access_token");
-        const [catsRes, itemsRes] = await Promise.all([
+        const userStr = await Storage.getItem("user");
+        if (userStr) setUser(JSON.parse(userStr));
+        const [catsRes, itemsRes, availRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/menu/categories`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
           axios.get(`${API_BASE_URL}/menu/items`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          axios
+            .get(`${API_BASE_URL}/menu/availability`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            .catch(() => ({ data: {} })),
         ]);
 
         setCategories(catsRes.data);
         setItems(itemsRes.data);
+        setAvailability(availRes.data || {});
         if (catsRes.data.length > 0) {
           setSelectedCategory(catsRes.data[0]._id);
         }
@@ -116,6 +128,15 @@ export default function CreateOrderScreen() {
     const newCart = { ...cart };
 
     if (delta > 0) {
+      // Check availability before adding
+      const itemAvail = availability[item._id];
+      if (itemAvail && !itemAvail.available) {
+        Alert.alert(
+          "Mahsulot yetarli emas",
+          `Mini omborxonada yetarli mahsulot yo'q:\n${itemAvail.missing.join("\n")}`,
+        );
+        return;
+      }
       // Adding: Always target a "Pending" entry
       const pendingKey = item._id;
       if (!newCart[pendingKey]) {
@@ -166,20 +187,31 @@ export default function CreateOrderScreen() {
     try {
       const token = await Storage.getItem("access_token");
       const userStr = await Storage.getItem("user");
-      const user = userStr ? JSON.parse(userStr) : null;
+      const currentUser = userStr ? JSON.parse(userStr) : user;
+      const waiterId = currentUser?.id || currentUser?._id;
+      const waiterName = currentUser?.fullName || "Ofitsiant";
+
+      if (!waiterId) {
+        Alert.alert(
+          "Xatolik",
+          "Ofitsiant ma'lumotlari topilmadi. Iltimos, qayta kiring.",
+        );
+        return;
+      }
 
       const orderData = {
         tableId,
-        tableName,
+        tableName: tableName.toString(),
         items: cartItems.map((item) => ({
+          _id: item._id && !item._id.startsWith("old-") ? item._id : undefined,
           name: item.name,
           quantity: item.quantity,
           price: item.price,
           status: item.status || "Pending",
           department: item.department,
         })),
-        waiterId: user?.id || user?._id || "unknown",
-        waiterName: user?.fullName || "Ofitsiant",
+        waiterId,
+        waiterName,
         totalAmount: calculateTotal(),
         status: "Active",
       };
@@ -363,58 +395,84 @@ export default function CreateOrderScreen() {
 
       <ScrollView contentContainerStyle={styles.itemsScroll}>
         <View style={styles.itemsGrid}>
-          {filteredItems.map((item) => (
-            <View
-              key={item._id}
-              style={[styles.itemCard, { backgroundColor: colors.card }]}
-            >
-              <View style={styles.itemInfo}>
-                <Text style={[styles.itemName, { color: colors.text }]}>
-                  {item.name}
-                </Text>
-                <Text style={[styles.itemPrice, { color: colors.primary }]}>
-                  {item.price?.toLocaleString()} sūm
-                </Text>
-              </View>
-
-              <View style={styles.qtyControls}>
-                {cart[item._id] ? (
-                  <>
-                    <TouchableOpacity
-                      onPress={() => updateQuantity(item, -1)}
-                      style={[
-                        styles.qtyBtn,
-                        { backgroundColor: colors.primary + "20" },
-                        cart[item._id].quantity <=
-                          (originalQuantities[item._id] || 0) && {
-                          opacity: 0.3,
-                        },
-                      ]}
-                      disabled={
-                        cart[item._id].quantity <=
-                        (originalQuantities[item._id] || 0)
-                      }
-                    >
-                      <MaterialCommunityIcons
-                        name="minus"
-                        size={18}
-                        color={colors.primary}
-                      />
-                    </TouchableOpacity>
-                    <Text style={[styles.qtyText, { color: colors.text }]}>
-                      {cart[item._id].quantity}
+          {filteredItems.map((item) => {
+            const itemAvail = availability[item._id];
+            const isUnavailable = itemAvail && !itemAvail.available;
+            return (
+              <View
+                key={item._id}
+                style={[
+                  styles.itemCard,
+                  { backgroundColor: colors.card },
+                  isUnavailable && { opacity: 0.55 },
+                ]}
+              >
+                <View style={styles.itemInfo}>
+                  <Text style={[styles.itemName, { color: colors.text }]}>
+                    {item.name}
+                  </Text>
+                  {isUnavailable ? (
+                    <Text style={styles.outOfStockLabel}>
+                      Yetarli mahsulot yo'q
                     </Text>
-                  </>
-                ) : null}
-                <TouchableOpacity
-                  onPress={() => updateQuantity(item, 1)}
-                  style={[styles.qtyBtn, { backgroundColor: colors.primary }]}
-                >
-                  <MaterialCommunityIcons name="plus" size={18} color="white" />
-                </TouchableOpacity>
+                  ) : (
+                    <Text style={[styles.itemPrice, { color: colors.primary }]}>
+                      {item.price?.toLocaleString()} sūm
+                    </Text>
+                  )}
+                </View>
+
+                <View style={styles.qtyControls}>
+                  {cart[item._id] ? (
+                    <>
+                      <TouchableOpacity
+                        onPress={() => updateQuantity(item, -1)}
+                        style={[
+                          styles.qtyBtn,
+                          { backgroundColor: colors.primary + "20" },
+                          cart[item._id].quantity <=
+                            (originalQuantities[item._id] || 0) && {
+                            opacity: 0.3,
+                          },
+                        ]}
+                        disabled={
+                          cart[item._id].quantity <=
+                          (originalQuantities[item._id] || 0)
+                        }
+                      >
+                        <MaterialCommunityIcons
+                          name="minus"
+                          size={18}
+                          color={colors.primary}
+                        />
+                      </TouchableOpacity>
+                      <Text style={[styles.qtyText, { color: colors.text }]}>
+                        {cart[item._id].quantity}
+                      </Text>
+                    </>
+                  ) : null}
+                  <TouchableOpacity
+                    onPress={() => updateQuantity(item, 1)}
+                    disabled={isUnavailable}
+                    style={[
+                      styles.qtyBtn,
+                      {
+                        backgroundColor: isUnavailable
+                          ? "#CBD5E1"
+                          : colors.primary,
+                      },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="plus"
+                      size={18}
+                      color="white"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </ScrollView>
 
@@ -487,6 +545,7 @@ const styles = StyleSheet.create({
   itemInfo: { flex: 1, gap: 4 },
   itemName: { fontSize: 16, fontWeight: "600" },
   itemPrice: { fontSize: 14, fontWeight: "bold" },
+  outOfStockLabel: { fontSize: 12, fontWeight: "600", color: "#EF4444" },
   qtyControls: { flexDirection: "row", alignItems: "center", gap: 12 },
   qtyBtn: {
     width: 32,

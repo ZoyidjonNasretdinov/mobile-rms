@@ -84,7 +84,7 @@ export default function TablesAdminScreen() {
               headers: { Authorization: `Bearer ${token}` },
             });
             fetchTables();
-          } catch (error) {
+          } catch {
             Alert.alert("Xato", "O'chirishda xatolik yuz berdi");
           }
         },
@@ -132,7 +132,9 @@ export default function TablesAdminScreen() {
           )}
         </View>
         <Text style={[styles.tableSub, { color: colors.secondary }]}>
-          Sig'imi: {item.capacity} kishi
+          {"Sig'imi: "}
+          {item.capacity}
+          {" kishi"}
         </Text>
       </View>
       <View style={styles.cardActions}>

@@ -21,7 +21,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter } from "expo-router";
-import { Translations } from "@/constants/translations";
+// import { Translations } from "@/constants/translations";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
@@ -67,7 +67,7 @@ export default function CreateProcurementScreen() {
   const [items, setItems] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [fetchingData, setFetchingData] = useState(true);
+  // const [fetchingData, setFetchingData] = useState(true);
   const [showProductModal, setShowProductModal] = useState(false);
   const [productSearch, setProductSearch] = useState("");
 
@@ -89,7 +89,7 @@ export default function CreateProcurementScreen() {
     { label: "Hamkor 2", value: "partner2" },
   ];
 
-  const units = ["kg", "litr", "ta", "bog'", "blok", "metr"];
+  // const units = ["kg", "litr", "ta", "bog'", "blok", "metr"];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -105,7 +105,7 @@ export default function CreateProcurementScreen() {
       } catch (error) {
         console.error("Fetch data error:", error);
       } finally {
-        setFetchingData(false);
+        // setFetchingData(false);
       }
     };
     fetchData();
@@ -128,7 +128,7 @@ export default function CreateProcurementScreen() {
     setLoading(true);
     try {
       const token = await Storage.getItem("access_token");
-      const res = await axios.post(
+      await axios.post(
         `${API_BASE_URL}/procurement`,
         {
           ...form,
@@ -260,7 +260,7 @@ export default function CreateProcurementScreen() {
                     color={colors.success}
                   />
                   <Text style={[styles.linkedText, { color: colors.success }]}>
-                    Omborga bog'langan
+                    {"Omborga bog'langan"}
                   </Text>
                 </View>
               ) : (
@@ -369,7 +369,7 @@ export default function CreateProcurementScreen() {
 
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
-                To'lov manbasi
+                {"To'lov manbasi"}
               </Text>
               <View style={styles.chipGrid}>
                 {sources.map((s) => (

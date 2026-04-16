@@ -28,8 +28,8 @@ import axios from "axios";
 import { CONFIG } from "@/constants/config";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
-const t = Translations.uz.menu;
-const common = Translations.uz.common;
+// const t = Translations.uz.menu;
+// const common = Translations.uz.common;
 
 export default function CreateMenuItemScreen() {
   const router = useRouter();
@@ -371,7 +371,7 @@ export default function CreateMenuItemScreen() {
               >
                 <MaterialCommunityIcons name="plus" size={20} color="white" />
                 <Text style={{ color: "white", fontWeight: "bold" }}>
-                  Qo'shish
+                  {"Qo'shish"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -478,7 +478,7 @@ export default function CreateMenuItemScreen() {
                   marginTop: 10,
                 }}
               >
-                Hali masalliqlar qo'shilmagan
+                {"Hali masalliqlar qo'shilmagan"}
               </Text>
             )}
           </View>
@@ -592,7 +592,7 @@ export default function CreateMenuItemScreen() {
                           <Text
                             style={{ fontWeight: "bold", color: colors.text }}
                           >
-                            {p.costPerUnit?.toLocaleString()} so'm
+                            {`${p.costPerUnit?.toLocaleString()} so'm`}
                           </Text>
                         </Text>
                       </View>

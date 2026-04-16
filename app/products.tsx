@@ -107,7 +107,7 @@ export default function ProductsScreen() {
       setCategories(catRes.data);
     } catch (error) {
       console.error("Fetch products error:", error);
-      Alert.alert(common.error, "Ma'lumotlarni yuklab bo'mladi");
+      Alert.alert(common.error, "Ma'lumotlarni yuklab bo'lmadi");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -137,7 +137,7 @@ export default function ProductsScreen() {
       setEditingCatId(null);
       setSelectedIcon("package-variant-closed");
       fetchProducts();
-    } catch (error) {
+    } catch {
       Alert.alert(common.error, "Kategoriyani saqlab bo'lmadi");
     } finally {
       setSavingCat(false);
@@ -160,7 +160,7 @@ export default function ProductsScreen() {
                 headers: { Authorization: `Bearer ${token}` },
               });
               fetchProducts();
-            } catch (error) {
+            } catch {
               Alert.alert(common.error, "O'chirishda xatolik");
             }
           },
@@ -209,7 +209,7 @@ export default function ProductsScreen() {
                 headers: { Authorization: `Bearer ${token}` },
               });
               fetchProducts();
-            } catch (error) {
+            } catch {
               Alert.alert(common.error, "O'chirishda xatolik");
             }
           },
@@ -245,6 +245,7 @@ export default function ProductsScreen() {
               name: product.name,
               category: product.category,
               unit: product.unit,
+              minThreshold: product.minThreshold?.toString() || "0",
             },
           })
         }
@@ -450,8 +451,7 @@ export default function ProductsScreen() {
                 Mahsulotlar topilmadi
               </Text>
               <Text style={[styles.emptySubText, { color: colors.secondary }]}>
-                Qidiruv shartlarini o'zgartirib ko'ring yoki yangi mahsulot
-                qo'shing
+                {`Qidiruv shartlarini o'zgartirib ko'ring yoki yangi mahsulot qo'shing`}
               </Text>
             </View>
           ) : (
@@ -554,7 +554,7 @@ export default function ProductsScreen() {
                         marginTop: 20,
                       }}
                     >
-                      Kategoriyalar yo'q
+                      {"Kategoriyalar yo'q"}
                     </Text>
                   )}
                 </ScrollView>

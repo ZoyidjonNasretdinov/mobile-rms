@@ -19,12 +19,12 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { Translations } from "@/constants/translations";
+// import { Translations } from "@/constants/translations";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
 
-const t = Translations.uz.inventory;
+// const t = Translations.uz.inventory;
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
 export default function CreateInventoryScreen() {
@@ -58,8 +58,8 @@ export default function CreateInventoryScreen() {
           headers: { Authorization: `Bearer ${token}` },
         });
         setCategories(res.data);
-      } catch (error) {
-        console.error("Fetch categories error:", error);
+      } catch {
+        console.error("Fetch categories error:");
       } finally {
         setFetchingCats(false);
       }
@@ -124,8 +124,8 @@ export default function CreateInventoryScreen() {
                 },
               );
               router.back();
-            } catch (error) {
-              Alert.alert("Xato", "O'chirishda xatolik");
+            } catch {
+              Alert.alert("Xato", "Kategoriyani o'chirib bo'lmadi");
             }
           },
         },
@@ -248,7 +248,7 @@ export default function CreateInventoryScreen() {
 
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
-                O'lchov birligi
+                {"O'lchov birligi"}
               </Text>
               <View style={styles.chipGrid}>
                 {units.map((u) => (

@@ -41,7 +41,7 @@ export default function ProfileScreen() {
       await Storage.removeItem("access_token");
       await Storage.removeItem("user");
       router.replace("/login");
-    } catch (error) {
+    } catch {
       Alert.alert(common.error, "Tizimdan chiqishda xato yuz berdi");
     }
   };
@@ -60,7 +60,7 @@ export default function ProfileScreen() {
             });
             await handleLogout();
             Alert.alert("Muvaffaqiyat", t.deleteSuccess);
-          } catch (error) {
+          } catch {
             Alert.alert(common.error, "Hisobni o'chirishda xato yuz berdi");
           }
         },

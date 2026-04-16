@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -42,7 +42,7 @@ export default function MenuScreen() {
   const [newCatName, setNewCatName] = useState("");
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const token = await Storage.getItem("access_token");
       const headers = { Authorization: `Bearer ${token}` };
@@ -61,11 +61,11 @@ export default function MenuScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [activeCategory]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -93,7 +93,7 @@ export default function MenuScreen() {
       setNewCatName("");
       setEditingCatId(null);
       fetchData();
-    } catch (error) {
+    } catch {
       Alert.alert("Xato", "Kategoriyani saqlab bo'lmadi");
     }
   };
@@ -329,7 +329,7 @@ export default function MenuScreen() {
                 Taomlar topilmadi
               </Text>
               <Text style={[styles.emptySubText, { color: colors.secondary }]}>
-                Ushbu kategoriyada hali taomlar qo'shilmagan
+                {"Ushbu kategoriyada hali taomlar qo'shilmagan"}
               </Text>
             </View>
           )}
@@ -414,7 +414,7 @@ export default function MenuScreen() {
                         marginTop: 20,
                       }}
                     >
-                      Kategoriyalar yo'q
+                      {"Kategoriyalar yo'q"}
                     </Text>
                   )}
                 </ScrollView>

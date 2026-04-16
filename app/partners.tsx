@@ -28,7 +28,6 @@ export default function PartnersScreen() {
 
   const [partners, setPartners] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [refreshing, setRefreshing] = React.useState(false);
 
   const fetchData = async () => {
     try {
@@ -39,11 +38,9 @@ export default function PartnersScreen() {
       });
       setPartners(res.data);
       setLoading(false);
-      setRefreshing(false);
     } catch (error) {
       console.error("Fetch partners error:", error);
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
@@ -217,7 +214,7 @@ export default function PartnersScreen() {
               marginTop: 20,
             }}
           >
-            Hozircha sheriklar yo'q
+            {"Hozircha sheriklar yo'q"}
           </Text>
         )}
 
@@ -232,7 +229,7 @@ export default function PartnersScreen() {
               color={colors.success}
             />
             <Text style={[styles.activityText, { color: colors.text }]}>
-              {t.names.partner1} 5 mln so'm go'sht uchun kiritdi
+              {`${t.names.partner1} 5 mln so'm go'sht uchun kiritdi`}
             </Text>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -243,7 +240,7 @@ export default function PartnersScreen() {
               color={colors.success}
             />
             <Text style={[styles.activityText, { color: colors.text }]}>
-              {t.names.partner2} ko'mir uchun 1.2 mln so'm kiritdi
+              {`${t.names.partner2} ko'mir uchun 1.2 mln so'm kiritdi`}
             </Text>
           </View>
         </View>

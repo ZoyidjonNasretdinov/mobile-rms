@@ -127,7 +127,7 @@ export default function InventoryStatusScreen() {
       setNewCatName("");
       fetchData();
       Alert.alert("Muvaffaqiyat", "Kategoriya yaratildi");
-    } catch (error) {
+    } catch {
       Alert.alert("Xato", "Kategoriya yaratib bo'lmadi");
     }
   };
@@ -166,7 +166,7 @@ export default function InventoryStatusScreen() {
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      const matchesSearch = item.name
+      const matchesSearch = (item.name || "")
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
       const categoryName = item.category || "";
@@ -483,7 +483,7 @@ export default function InventoryStatusScreen() {
           >
             <View style={styles.statsSection}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Bo'limlardagi qoldiqlar
+                {"Bo'limlardagi qoldiqlar"}
               </Text>
               <ScrollView
                 horizontal
@@ -496,7 +496,7 @@ export default function InventoryStatusScreen() {
                     (st) => st.userId === s._id,
                   );
                   const lowStockCount = deptStock.filter(
-                    (i) => i.quantity < 1,
+                    (i) => i.quantity < (i.productId?.minThreshold || 0),
                   ).length;
 
                   return (
@@ -613,7 +613,7 @@ export default function InventoryStatusScreen() {
                                 marginTop: 4,
                               }}
                             >
-                              Bo'sh
+                              {"Bo'sh"}
                             </Text>
                           </View>
                         )}
@@ -689,7 +689,7 @@ export default function InventoryStatusScreen() {
                 color={colors.secondary + "40"}
               />
               <Text style={[styles.emptyText, { color: colors.secondary }]}>
-                Hozircha chiqim tarixi yo'q
+                {"Hozircha chiqim tarixi yo'q"}
               </Text>
             </View>
           ) : (
@@ -765,7 +765,7 @@ export default function InventoryStatusScreen() {
               Tarqatish: {selectedItem?.name}
             </Text>
             <Text style={[styles.label, { color: colors.secondary }]}>
-              Bo'lim
+              {"Bo'lim"}
             </Text>
             <View style={styles.deptGrid}>
               {departments.map((d) => (
@@ -892,7 +892,7 @@ export default function InventoryStatusScreen() {
                         padding: 20,
                       }}
                     >
-                      Kategoriyalar yo'q
+                      {"Kategoriyalar yo'q"}
                     </Text>
                   )}
                 </ScrollView>

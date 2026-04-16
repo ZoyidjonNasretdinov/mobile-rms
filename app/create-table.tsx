@@ -139,7 +139,7 @@ export default function CreateTableScreen() {
 
         <View style={styles.inputGroup}>
           <Text style={[styles.label, { color: colors.secondary }]}>
-            Sig'imi (kishi)
+            {"Sig'imi (kishi)"}
           </Text>
           <View style={[styles.inputBox, { backgroundColor: colors.card }]}>
             <TextInput

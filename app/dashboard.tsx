@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+// import * as SecureStore from "expo-secure-store";
 import { Storage } from "@/utils/storage";
 import { StatusBar } from "expo-status-bar";
 import { Colors } from "@/constants/theme";
@@ -32,15 +32,14 @@ export default function DashboardScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
-  const [userName, setUserName] = useState(t.title);
   const [activeStaffCount, setActiveStaffCount] = useState({
     active: 0,
     total: 0,
   });
+  const [role, setRole] = useState("");
   const [revenue, setRevenue] = useState(0);
   const [orderCount, setOrderCount] = useState(0);
   const [stockStats, setStockStats] = useState({ low: 0, total: 0 });
-  const [role, setRole] = useState("");
   const [activeShift, setActiveShift] = useState<any>(null);
   const [isShiftActive, setIsShiftActive] = useState(false);
   const [showShiftModal, setShowShiftModal] = useState(false);
@@ -52,14 +51,11 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      // Load user info
       const userStr = await Storage.getItem("user");
       if (userStr) {
         const user = JSON.parse(userStr);
-        setUserName(user.fullName || user.name || t.title);
         setRole(user.role);
 
-        // Auto-redirect roles to their stations if not owner
         const userRole = user.role?.toLowerCase();
         if (userRole === "ofisiant") router.replace("/waiter");
         if (["oshpaz", "shashlikchi", "salatchi", "bar"].includes(userRole))
@@ -67,12 +63,10 @@ export default function DashboardScreen() {
         if (userRole === "kassier") router.replace("/cashier");
       }
 
-      // Load stats
       try {
         const token = await Storage.getItem("access_token");
         const headers = { Authorization: `Bearer ${token}` };
 
-        // 1. Staff stats
         const usersRes = await axios.get(`${CONFIG.API_BASE_URL}/users`, {
           headers,
         });
@@ -80,7 +74,6 @@ export default function DashboardScreen() {
         const active = staff.filter((s: any) => s.isActive).length;
         setActiveStaffCount({ active, total: staff.length });
 
-        // 2. Revenue and order stats for TODAY
         const now = new Date();
         const startOfDay = new Date(
           now.getFullYear(),
@@ -103,7 +96,6 @@ export default function DashboardScreen() {
         setRevenue(statsRes.data.totalRevenue);
         setOrderCount(statsRes.data.totalOrderCount);
 
-        // 3. Inventory stats
         const productsRes = await axios.get(
           `${CONFIG.API_BASE_URL}/inventory/products`,
           { headers },
@@ -114,7 +106,6 @@ export default function DashboardScreen() {
         ).length;
         setStockStats({ low: lowStock, total: products.length });
 
-        // 4. Shift status
         const shiftRes = await axios.get(
           `${CONFIG.API_BASE_URL}/shifts/active`,
           { headers },
@@ -191,13 +182,9 @@ export default function DashboardScreen() {
           ? { openedBy: userId, startCash: cashValue }
           : { closedBy: userId, endCash: cashValue };
 
-      const response = await axios.post(
-        `${CONFIG.API_BASE_URL}${endpoint}`,
-        body,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      await axios.post(`${CONFIG.API_BASE_URL}${endpoint}`, body, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       setShowShiftModal(false);
 

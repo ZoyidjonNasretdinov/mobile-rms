@@ -25,7 +25,7 @@ import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
 
-const t = Translations.uz.products;
+// const t = Translations.uz.products;
 const common = Translations.uz.common;
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
@@ -42,6 +42,7 @@ export default function CreateProductScreen() {
     name: (params.name as string) || "",
     category: (params.category as string) || "Boshqalar",
     unit: (params.unit as string) || "kg",
+    minThreshold: (params.minThreshold as string) || "0",
   });
 
   const [categories, setCategories] = useState<any[]>([]);
@@ -61,8 +62,8 @@ export default function CreateProductScreen() {
         if (res.data.length > 0 && !isEditing) {
           setForm((f) => ({ ...f, category: res.data[0].name }));
         }
-      } catch (error) {
-        console.error("Fetch categories error:", error);
+      } catch {
+        console.error("Fetch categories error:");
       } finally {
         setFetchingCats(false);
       }
@@ -81,6 +82,7 @@ export default function CreateProductScreen() {
       const token = await Storage.getItem("access_token");
       const data = {
         ...form,
+        minThreshold: Number(form.minThreshold) || 0,
       };
 
       if (isEditing) {
@@ -99,8 +101,8 @@ export default function CreateProductScreen() {
 
       Alert.alert("Muvaffaqiyat", "Ma'lumotlar saqlandi");
       router.back();
-    } catch (error) {
-      console.error("Save product error:", error);
+    } catch {
+      console.error("Save product error:");
       Alert.alert(common.error, "Saqlashda xatolik yuz berdi");
     } finally {
       setLoading(false);
@@ -208,7 +210,7 @@ export default function CreateProductScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.secondary }]}>
-              O'lchov birligi
+              {"O'lchov birligi"}
             </Text>
             <View style={styles.chips}>
               {units.map((u) => (
@@ -237,6 +239,33 @@ export default function CreateProductScreen() {
                   </Text>
                 </TouchableOpacity>
               ))}
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.secondary }]}>
+              Minimum qoldiq (Ogohlantirish uchun)
+            </Text>
+            <View
+              style={[
+                styles.inputWrapper,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="alert-outline"
+                size={20}
+                color={colors.secondary}
+                style={{ marginRight: 10 }}
+              />
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="Masalan: 5, 10..."
+                placeholderTextColor={colors.secondary}
+                keyboardType="numeric"
+                value={form.minThreshold}
+                onChangeText={(val) => setForm({ ...form, minThreshold: val })}
+              />
             </View>
           </View>
         </ScrollView>

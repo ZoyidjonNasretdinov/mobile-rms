@@ -94,10 +94,8 @@ export default function CreateStaffScreen() {
         Alert.alert("Muvaffaqiyat", "Yangi xodim qo'shildi");
       }
       router.back();
-    } catch (error: any) {
-      console.error("Staff save error:", error);
-      const msg = error.response?.data?.message || "Xatolik yuz berdi";
-      Alert.alert("Xato", msg);
+    } catch (_) {
+      Alert.alert("Xato", "Xatolik yuz berdi");
     } finally {
       setLoading(false);
     }

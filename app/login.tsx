@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+// import * as SecureStore from "expo-secure-store";
 import { Storage } from "@/utils/storage";
 import { CONFIG } from "@/constants/config";
 import axios from "axios";
@@ -24,7 +24,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Translations } from "../constants/translations";
 
 const t = Translations.uz.auth;
-const tc = Translations.uz.common;
 
 const API_URL = `${CONFIG.API_BASE_URL}/auth/login`;
 
@@ -33,32 +32,9 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isPhoneFocused, setIsPhoneFocused] = useState(false);
-  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [localError, setLocalError] = useState("");
   const router = useRouter();
   const passwordRef = useRef<any>(null);
-
-  const formatPhone = (text: string) => {
-    // Keep only digits
-    const cleaned = text.replace(/\D/g, "");
-
-    // Start with 998 if empty or not starting with it
-    let result = cleaned;
-    if (result.length > 0 && !result.startsWith("998")) {
-      result = "998" + result;
-    }
-    if (result.length === 0) return "";
-
-    let formatted = "+";
-    if (result.length > 0) formatted += result.substring(0, 3);
-    if (result.length > 3) formatted += " " + result.substring(3, 5);
-    if (result.length > 5) formatted += " " + result.substring(5, 8);
-    if (result.length > 8) formatted += " " + result.substring(8, 10);
-    if (result.length > 10) formatted += " " + result.substring(10, 12);
-
-    return formatted.substring(0, 17);
-  };
 
   const handlePhoneChange = (text: string) => {
     // Just keep the text as is or filter non-digits if needed,
@@ -154,8 +130,6 @@ export default function LoginScreen() {
                   keyboardType="phone-pad"
                   value={phone}
                   onChangeText={handlePhoneChange}
-                  onFocus={() => setIsPhoneFocused(true)}
-                  onBlur={() => setIsPhoneFocused(false)}
                   autoCapitalize="none"
                   autoComplete="off"
                   importantForAutofill="no"
@@ -185,8 +159,6 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
-                  onFocus={() => setIsPasswordFocused(true)}
-                  onBlur={() => setIsPasswordFocused(false)}
                   autoComplete="off"
                   importantForAutofill="no"
                   textContentType="none"

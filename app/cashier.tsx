@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -21,7 +21,6 @@ import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
 import * as Haptics from "expo-haptics";
-import * as Speech from "expo-speech";
 import { socketService } from "@/utils/socket";
 import { notificationService } from "@/utils/notifications";
 
@@ -87,6 +86,7 @@ export default function CashierScreen() {
         notificationService.notify(
           "Yangi buyurtma tushdi!",
           Haptics.NotificationFeedbackType.Success,
+          "alarm",
         );
       });
       socket.on("orderUpdated", handleUpdate);
@@ -156,14 +156,6 @@ export default function CashierScreen() {
       o.tableName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.waiterName?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
-
-  const stats = {
-    pendingCount: orders.length,
-    totalRevenue: orders.reduce(
-      (acc, o) => acc + (o.status === "Paid" ? o.totalAmount : 0),
-      0,
-    ),
-  };
 
   return (
     <SafeAreaView

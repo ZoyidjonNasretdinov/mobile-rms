@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -70,7 +70,7 @@ export default function StaffManagementScreen() {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       fetchStaff();
-    } catch (error) {
+    } catch {
       Alert.alert("Xato", "Statusni o'zgartirishda xatolik");
     }
   };
@@ -88,7 +88,7 @@ export default function StaffManagementScreen() {
               headers: { Authorization: `Bearer ${token}` },
             });
             fetchStaff();
-          } catch (error) {
+          } catch {
             Alert.alert("Xato", "O'chirishda xatolik");
           }
         },
@@ -349,7 +349,7 @@ export default function StaffManagementScreen() {
                         { headers: { Authorization: `Bearer ${token}` } },
                       );
                       fetchStaff();
-                    } catch (error) {
+                    } catch {
                       Alert.alert("Xato", "Amalni bajarib bo'lmadi");
                     }
                   },

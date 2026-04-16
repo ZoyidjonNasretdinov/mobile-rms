@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from "react";
 import {
   StyleSheet,
   View,
@@ -16,7 +22,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import { Translations } from "@/constants/translations";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
@@ -54,7 +59,7 @@ export default function ReportsScreen() {
 
   const userRef = useRef<any>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const token = await Storage.getItem("access_token");
       if (!token) return;
@@ -82,9 +87,9 @@ export default function ReportsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [period]);
 
-  const fetchShiftStatus = async () => {
+  const fetchShiftStatus = useCallback(async () => {
     try {
       const token = await Storage.getItem("access_token");
       const shiftRes = await axios.get(`${API_BASE_URL}/shifts/active`, {
@@ -95,7 +100,7 @@ export default function ReportsScreen() {
     } catch (error) {
       console.error("Shift fetch error:", error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -125,7 +130,7 @@ export default function ReportsScreen() {
       socket.off("orderCreated", handleUpdate);
       socket.off("orderUpdated", handleUpdate);
     };
-  }, [period]);
+  }, [fetchData, fetchShiftStatus]);
 
   const handleShiftAction = async () => {
     const val = parseFloat(cashValue) || 0;
@@ -370,7 +375,7 @@ export default function ReportsScreen() {
             >
               <View style={styles.chartHeader}>
                 <Text style={[styles.boxTitle, { color: colors.text }]}>
-                  Moliyaviy ko'rsatkichlar
+                  {"Moliyaviy ko'rsatkichlar"}
                 </Text>
                 <View style={styles.legend}>
                   <View style={styles.legendItem}>
@@ -492,7 +497,7 @@ export default function ReportsScreen() {
                       {item.name}
                     </Text>
                     <Text style={{ fontSize: 11, color: colors.secondary }}>
-                      {(item.price || 0).toLocaleString()} so'm
+                      {`${(item.price || 0).toLocaleString()} so'm`}
                     </Text>
                   </View>
                   <Text style={[styles.itemCount, { color: colors.secondary }]}>

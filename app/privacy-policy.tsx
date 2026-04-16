@@ -45,56 +45,54 @@ export default function PrivacyPolicyScreen() {
           Maxfiylik Siyosati
         </Text>
         <Text style={[styles.date, { color: colors.secondary }]}>
-          Oxirgi yangilanish: 12-aprel, 2026
+          {"Oxirgi yangilanish: 12-aprel, 2026"}
         </Text>
 
         <Text style={[styles.paragraph, { color: colors.text }]}>
-          Ushbu maxfiylik siyosati "RMS" (Restaurant Management System) mobil
-          ilovasi orqali to'planadigan ma'lumotlar va ulardan foydalanish
-          tartibini tushuntiradi.
+          {`Ushbu maxfiylik siyosati "RMS" (Restaurant Management System) mobil ilovasi orqali to'planadigan ma'lumotlar va ulardan foydalanish tartibini tushuntiradi.`}
         </Text>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          1. Ma'lumotlarni to'plash
+          {"1. Ma'lumotlarni to'plash"}
         </Text>
         <Text style={[styles.paragraph, { color: colors.text }]}>
-          Ilova siz tizimdan foydalanganingizda quyidagi ma'lumotlarni to'plashi
-          mumkin:
-          {"\n"}• Ism va familiya (xodimlarni identifikatsiya qilish uchun)
-          {"\n"}• Telefon raqami (kirish uchun)
-          {"\n"}• Lavozim (huquqlarni belgilash uchun)
+          {
+            "Ilova siz tizimdan foydalanganingizda quyidagi ma'lumotlarni to'plashi mumkin:"
+          }
+          {"\n"}• {"Ism va familiya (xodimlarni identifikatsiya qilish uchun)"}
+          {"\n"}• {"Telefon raqami (kirish uchun)"}
+          {"\n"}• {"Lavozim (huquqlarni belgilash uchun)"}
         </Text>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          2. Ma'lumotlardan foydalanish
+          {"2. Ma'lumotlardan foydalanish"}
         </Text>
         <Text style={[styles.paragraph, { color: colors.text }]}>
-          To'plangan ma'lumotlar faqat restoran ichki operatsiyalarini
-          boshqarish va xavfsizlikni ta'minlash maqsadida ishlatiladi.
-          Ma'lumotlar tashqi shaxslarga sotilmaydi yoki ulashilmaydi.
+          {
+            "To'plangan ma'lumotlar faqat restoran ichki operatsiyalarini boshqarish va xavfsizlikni ta'minlash maqsadida ishlatiladi. Ma'lumotlar tashqi shaxslarga sotilmaydi yoki ulashilmaydi."
+          }
         </Text>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          3. Ma'lumotlarni o'chirish
+          {"3. Ma'lumotlarni o'chirish"}
         </Text>
         <Text style={[styles.paragraph, { color: colors.text }]}>
-          Foydalanuvchi istalgan vaqtda o'z hisobini "Profil" bo'limi orqali
-          o'chirishi mumkin. Hisob o'chirilganda foydalanuvchining barcha
-          shaxsiy ma'lumotlari tizimdan butunlay o'chiriladi.
+          {`Foydalanuvchi istalgan vaqtda o'z hisobini "Profil" bo'limi orqali o'chirishi mumkin. Hisob o'chirilganda foydalanuvchining barcha shaxsiy ma'lumotlari tizimdan butunlay o'chiriladi.`}
         </Text>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           4. Xavfsizlik
         </Text>
         <Text style={[styles.paragraph, { color: colors.text }]}>
-          Biz sizning ma'lumotlaringizni himoya qilish uchun zamonaviy shifrlash
-          texnologiyalaridan foydalanamiz.
+          {
+            "Biz sizning ma'lumotlaringizni himoya qilish uchun zamonaviy shifrlash texnologiyalaridan foydalanamiz."
+          }
         </Text>
 
         <Text
           style={[styles.paragraph, { color: colors.secondary, marginTop: 20 }]}
         >
-          Savollaringiz bo'lsa, tizim administratori bilan bog'laning.
+          {"Savollaringiz bo'lsa, tizim administratori bilan bog'laning."}
         </Text>
       </ScrollView>
     </SafeAreaView>
