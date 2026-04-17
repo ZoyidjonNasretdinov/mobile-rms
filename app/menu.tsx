@@ -22,6 +22,7 @@ import { Translations } from "@/constants/translations";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
+import MenuItemModal from "@/components/MenuItemModal";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
 const t = Translations.uz.menu;
@@ -41,6 +42,9 @@ export default function MenuScreen() {
   const [catModal, setCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
+
+  const [itemModal, setItemModal] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -171,7 +175,10 @@ export default function MenuScreen() {
             />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => router.push("/create-menu-item")}
+            onPress={() => {
+              setSelectedItemId(null);
+              setItemModal(true);
+            }}
             style={[styles.addBtn, { backgroundColor: colors.primary }]}
           >
             <MaterialCommunityIcons name="plus" size={24} color="white" />
@@ -233,12 +240,10 @@ export default function MenuScreen() {
             <TouchableOpacity
               key={item._id}
               activeOpacity={0.7}
-              onPress={() =>
-                router.push({
-                  pathname: "/create-menu-item",
-                  params: { id: item._id },
-                })
-              }
+              onPress={() => {
+                setSelectedItemId(item._id);
+                setItemModal(true);
+              }}
               style={[styles.itemCard, { backgroundColor: colors.card }]}
             >
               <View style={styles.itemMain}>
@@ -452,6 +457,16 @@ export default function MenuScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      <MenuItemModal
+        visible={itemModal}
+        itemId={selectedItemId}
+        onClose={() => {
+          setItemModal(false);
+          setSelectedItemId(null);
+        }}
+        onSave={fetchData}
+      />
     </SafeAreaView>
   );
 }

@@ -134,13 +134,23 @@ export default function ReportsScreen() {
 
   const handleShiftAction = async () => {
     const val = parseFloat(cashValue) || 0;
+
+    const userId = userRef.current?._id || userRef.current?.id || "";
+    if (!userId) {
+      Alert.alert(
+        "Xato",
+        "Foydalanuvchi ma'lumotlari topilmadi. Qaytadan login qiling.",
+      );
+      return;
+    }
+
     try {
       const token = await Storage.getItem("access_token");
       const endpoint = modalType === "start" ? "start" : "end";
       const payload =
         modalType === "start"
-          ? { openedBy: user._id, startCash: val }
-          : { closedBy: user._id, endCash: val };
+          ? { openedBy: userId, startCash: val }
+          : { closedBy: userId, endCash: val };
 
       await axios.post(`${API_BASE_URL}/shifts/${endpoint}`, payload, {
         headers: { Authorization: `Bearer ${token}` },

@@ -200,7 +200,7 @@ export default function InventoryStatusScreen() {
             style={[styles.itemIcon, { backgroundColor: colors.background }]}
           >
             <MaterialCommunityIcons
-              name="package-variant-closed"
+              name={(item.icon as any) || "package-variant-closed"}
               size={24}
               color={colors.primary}
             />
@@ -273,6 +273,8 @@ export default function InventoryStatusScreen() {
                   currentStock: item.currentStock.toString(),
                   unit: item.unit,
                   minThreshold: item.minThreshold.toString(),
+                  icon: item.icon,
+                  costPerUnit: (item.costPerUnit || 0).toString(),
                 },
               })
             }

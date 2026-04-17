@@ -43,6 +43,9 @@ export default function CreateProductScreen() {
     category: (params.category as string) || "Boshqalar",
     unit: (params.unit as string) || "kg",
     minThreshold: (params.minThreshold as string) || "0",
+    currentStock: (params.currentStock as string) || "0",
+    costPerUnit: (params.costPerUnit as string) || "0",
+    icon: (params.icon as string) || "package-variant-closed",
   });
 
   const [categories, setCategories] = useState<any[]>([]);
@@ -88,15 +91,27 @@ export default function CreateProductScreen() {
       if (isEditing) {
         await axios.put(
           `${API_BASE_URL}/inventory/products/${params.id}`,
-          data,
+          {
+            ...data,
+            costPerUnit: Number(form.costPerUnit) || 0,
+            currentStock: Number(form.currentStock) || 0,
+          },
           {
             headers: { Authorization: `Bearer ${token}` },
           },
         );
       } else {
-        await axios.post(`${API_BASE_URL}/inventory/products`, data, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await axios.post(
+          `${API_BASE_URL}/inventory/products`,
+          {
+            ...data,
+            costPerUnit: Number(form.costPerUnit) || 0,
+            currentStock: Number(form.currentStock) || 0,
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
       }
 
       Alert.alert("Muvaffaqiyat", "Ma'lumotlar saqlandi");
@@ -107,6 +122,38 @@ export default function CreateProductScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDelete = async () => {
+    Alert.alert(
+      "O'chirish",
+      "Haqiqatan ham ushbu mahsulotni o'chirib tashlamoqchimisiz? Bu amalni ortga qaytarib bo'lmaydi.",
+      [
+        { text: "Bekor qilish", style: "cancel" },
+        {
+          text: "O'chirish",
+          style: "destructive",
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const token = await Storage.getItem("access_token");
+              await axios.delete(
+                `${API_BASE_URL}/inventory/products/${params.id}`,
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                },
+              );
+              Alert.alert("Muvaffaqiyat", "Mahsulot o'chirildi");
+              router.back();
+            } catch {
+              Alert.alert("Xato", "O'chirishda xatolik yuz berdi");
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -268,6 +315,102 @@ export default function CreateProductScreen() {
               />
             </View>
           </View>
+
+          <View style={styles.rowInputs}>
+            <View style={[styles.inputGroup, { flex: 1 }]}>
+              <Text style={[styles.label, { color: colors.secondary }]}>
+                Hozirgi qoldiq
+              </Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="0"
+                  keyboardType="numeric"
+                  value={form.currentStock}
+                  onChangeText={(val) =>
+                    setForm({ ...form, currentStock: val })
+                  }
+                />
+              </View>
+            </View>
+            <View style={[styles.inputGroup, { flex: 1 }]}>
+              <Text style={[styles.label, { color: colors.secondary }]}>
+                Narxi (bir dona uchun)
+              </Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="0"
+                  keyboardType="numeric"
+                  value={form.costPerUnit}
+                  onChangeText={(val) => setForm({ ...form, costPerUnit: val })}
+                />
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.secondary }]}>
+              Ikona tanlash
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.iconGrid}
+            >
+              {[
+                "package-variant-closed",
+                "food-steak",
+                "carrot",
+                "leaf",
+                "grain",
+                "baguette",
+                "oil",
+                "cheese",
+                "tea",
+                "fruit-citrus",
+                "egg",
+                "tomato",
+                "chili-hot",
+                "potato",
+                "cucumber",
+                "bottle-wine",
+                "fire",
+                "flask-outline",
+              ].map((ic) => (
+                <TouchableOpacity
+                  key={ic}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setForm({ ...form, icon: ic });
+                  }}
+                  style={[
+                    styles.iconBtn,
+                    {
+                      backgroundColor:
+                        form.icon === ic ? colors.primary : colors.card,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={ic as any}
+                    size={24}
+                    color={form.icon === ic ? "white" : colors.secondary}
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         </ScrollView>
 
         <View
@@ -287,6 +430,18 @@ export default function CreateProductScreen() {
               <Text style={styles.submitBtnText}>Saqlash</Text>
             )}
           </TouchableOpacity>
+
+          {isEditing && (
+            <TouchableOpacity
+              style={[styles.deleteBtn, { marginTop: 12 }]}
+              onPress={handleDelete}
+              disabled={loading}
+            >
+              <Text style={[styles.deleteBtnText, { color: colors.danger }]}>
+                Mahsulotni o'chirish
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -361,4 +516,27 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   submitBtnText: { color: "white", fontSize: 16, fontWeight: "bold" },
+  rowInputs: { flexDirection: "row", gap: 16 },
+  iconGrid: { paddingVertical: 5, gap: 12 },
+  iconBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 1,
+  },
+  deleteBtn: {
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  deleteBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
 });
