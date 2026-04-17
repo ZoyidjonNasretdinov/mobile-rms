@@ -102,12 +102,13 @@ class NotificationService {
       .NotificationFeedbackType.Success,
     soundType: "ding" | "alarm" | "kitchen" = "ding",
   ) {
-    // 1. Haptics
+    // 1. Haptics - Keep haptics for feedback
     try {
       await Haptics.notificationAsync(hapticType);
     } catch (e) {}
 
-    // 2. Sound
+    // 2. Sound & Speech - Disabled by user request ("ovozlar kerak emas")
+    /*
     if (soundType === "alarm") {
       await this.playAlarm();
     } else if (soundType === "kitchen") {
@@ -116,7 +117,6 @@ class NotificationService {
       await this.playDing();
     }
 
-    // 3. Speech
     setTimeout(() => {
       Speech.speak(message, {
         language: "uz-UZ",
@@ -124,6 +124,7 @@ class NotificationService {
         rate: 0.9,
       });
     }, 600);
+    */
   }
 }
 

@@ -18,6 +18,7 @@ import { Storage } from "@/utils/storage";
 import { Translations } from "@/constants/translations";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
+import { socketService } from "@/utils/socket";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
@@ -39,7 +40,10 @@ export default function CreateOrderScreen() {
     [key: string]: number;
   }>({});
   const [availability, setAvailability] = useState<
-    Record<string, { available: boolean; missing: string[] }>
+    Record<
+      string,
+      { available: boolean; maxQuantity: number; missing: string[] }
+    >
   >({});
   const [user, setUser] = useState<any>(null);
 
@@ -122,6 +126,27 @@ export default function CreateOrderScreen() {
       }
     };
     fetchData();
+
+    const socket = socketService.getSocket();
+    const handleStockUpdate = async () => {
+      try {
+        const token = await Storage.getItem("access_token");
+        const availRes = await axios.get(`${API_BASE_URL}/menu/availability`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setAvailability(availRes.data || {});
+      } catch (e) {
+        console.error("Real-time availability fetch error:", e);
+      }
+    };
+
+    socket.on("stockUpdated", handleStockUpdate);
+    socket.on("staffStockUpdated", handleStockUpdate);
+
+    return () => {
+      socket.off("stockUpdated", handleStockUpdate);
+      socket.off("staffStockUpdated", handleStockUpdate);
+    };
   }, [orderId]);
 
   const updateQuantity = (item: any, delta: number) => {
@@ -130,10 +155,15 @@ export default function CreateOrderScreen() {
     if (delta > 0) {
       // Check availability before adding
       const itemAvail = availability[item._id];
-      if (itemAvail && !itemAvail.available) {
+      const maxPossible = itemAvail?.maxQuantity || 0;
+      const currentInCart =
+        (cart[item._id]?.quantity || 0) +
+        (cart[`${item._id}-Pending`]?.quantity || 0);
+
+      if (currentInCart + delta > maxPossible) {
         Alert.alert(
-          "Mahsulot yetarli emas",
-          `Mini omborxonada yetarli mahsulot yo'q:\n${itemAvail.missing.join("\n")}`,
+          "Cheklov",
+          `Mini omborxonada ushbu mahsulotdan ko'pi bilan ${maxPossible} ta tayyorlash mumkin.`,
         );
         return;
       }
@@ -416,9 +446,24 @@ export default function CreateOrderScreen() {
                       Yetarli mahsulot yo'q
                     </Text>
                   ) : (
-                    <Text style={[styles.itemPrice, { color: colors.primary }]}>
-                      {item.price?.toLocaleString()} sūm
-                    </Text>
+                    <View>
+                      <Text
+                        style={[styles.itemPrice, { color: colors.primary }]}
+                      >
+                        {item.price?.toLocaleString()} sūm
+                      </Text>
+                      {itemAvail?.maxQuantity !== undefined && (
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: colors.secondary,
+                            marginTop: 2,
+                          }}
+                        >
+                          Mavjud: {itemAvail.maxQuantity} dona
+                        </Text>
+                      )}
+                    </View>
                   )}
                 </View>
 
@@ -451,24 +496,39 @@ export default function CreateOrderScreen() {
                       </Text>
                     </>
                   ) : null}
-                  <TouchableOpacity
-                    onPress={() => updateQuantity(item, 1)}
-                    disabled={isUnavailable}
-                    style={[
-                      styles.qtyBtn,
-                      {
-                        backgroundColor: isUnavailable
-                          ? "#CBD5E1"
-                          : colors.primary,
-                      },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="plus"
-                      size={18}
-                      color="white"
-                    />
-                  </TouchableOpacity>
+
+                  {(!cart[item._id] ||
+                    cart[item._id].quantity < (itemAvail?.maxQuantity || 0)) &&
+                    !isUnavailable && (
+                      <TouchableOpacity
+                        onPress={() => updateQuantity(item, 1)}
+                        style={[
+                          styles.qtyBtn,
+                          {
+                            backgroundColor: colors.primary,
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="plus"
+                          size={18}
+                          color="white"
+                        />
+                      </TouchableOpacity>
+                    )}
+
+                  {cart[item._id]?.quantity >= (itemAvail?.maxQuantity || 0) &&
+                    !isUnavailable && (
+                      <View
+                        style={[styles.qtyBtn, { backgroundColor: "#F1F5F9" }]}
+                      >
+                        <MaterialCommunityIcons
+                          name="lock"
+                          size={16}
+                          color="#94A3B8"
+                        />
+                      </View>
+                    )}
                 </View>
               </View>
             );

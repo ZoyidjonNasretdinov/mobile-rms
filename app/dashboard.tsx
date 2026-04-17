@@ -23,6 +23,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import axios from "axios";
 import { socketService } from "@/utils/socket";
 import { CONFIG } from "@/constants/config";
+import { PDFService } from "@/utils/pdf-service";
 
 import { Translations } from "@/constants/translations";
 
@@ -48,6 +49,8 @@ export default function DashboardScreen() {
   );
   const [shiftCash, setShiftCash] = useState("0");
   const [processingShift, setProcessingShift] = useState(false);
+  const [eodReport, setEodReport] = useState<any>(null);
+  const [showEodModal, setShowEodModal] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -90,7 +93,7 @@ export default function DashboardScreen() {
         ).toISOString();
 
         const statsRes = await axios.get(
-          `${CONFIG.API_BASE_URL}/orders/stats?startDate=${startOfDay}&endDate=${endOfDay}`,
+          `${CONFIG.API_BASE_URL}/orders/stats`,
           { headers },
         );
         setRevenue(statsRes.data.totalRevenue);
@@ -182,18 +185,34 @@ export default function DashboardScreen() {
           ? { openedBy: userId, startCash: cashValue }
           : { closedBy: userId, endCash: cashValue };
 
-      await axios.post(`${CONFIG.API_BASE_URL}${endpoint}`, body, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const shiftRes = await axios.post(
+        `${CONFIG.API_BASE_URL}${endpoint}`,
+        body,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       setShowShiftModal(false);
 
-      Alert.alert(
-        "Muvaffaqiyatli",
-        shiftModalType === "start"
-          ? "Ish kuni boshlandi"
-          : "Ish kuni yakunlandi",
-      );
+      if (shiftModalType === "end") {
+        try {
+          const reportRes = await axios.get(
+            `${CONFIG.API_BASE_URL}/reports/shift-summary/${shiftRes.data._id}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          setEodReport(reportRes.data);
+          setShowEodModal(true);
+        } catch (reportError) {
+          console.error("Error fetching EOD report:", reportError);
+          Alert.alert(
+            "Muvaffaqiyatli",
+            "Ish kuni yakunlandi, ammo hisobotni yuklashda xatolik yuz berdi",
+          );
+        }
+      } else {
+        Alert.alert("Muvaffaqiyatli", "Ish kuni boshlandi");
+      }
 
       // Refresh state
       const refreshedShift = await axios.get(
@@ -564,6 +583,273 @@ export default function DashboardScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* EOD Report Modal */}
+      <Modal visible={showEodModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: colors.card, maxHeight: "90%" },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                {Translations.uz.eodReport.title}
+              </Text>
+              <TouchableOpacity onPress={() => setShowEodModal(false)}>
+                <MaterialCommunityIcons
+                  name="close"
+                  size={24}
+                  color={colors.secondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {eodReport && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {isShiftActive && (
+                  <View
+                    style={{
+                      padding: 16,
+                      backgroundColor: colors.primary + "10",
+                      borderRadius: 12,
+                      marginBottom: 16,
+                      borderWidth: 1,
+                      borderColor: colors.primary + "30",
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name="clock-check-outline"
+                        size={20}
+                        color={colors.primary}
+                      />
+                      <Text
+                        style={{
+                          fontWeight: "700",
+                          color: colors.primary,
+                          fontSize: 15,
+                        }}
+                      >
+                        Ish kuni ochiq
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: colors.secondary,
+                        lineHeight: 18,
+                      }}
+                    >
+                      Amaldagi ish kuni hali ochiq. Hisobotni ko'rishingiz
+                      mumkin, ammo yakuniy hisoblash uchun ish kunini yopish
+                      kerak.
+                    </Text>
+                  </View>
+                )}
+
+                <View style={{ gap: 10, marginBottom: 20 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.closeReportBtn,
+                      {
+                        backgroundColor: colors.success + "15",
+                        marginTop: 0,
+                        paddingVertical: 12,
+                      },
+                    ]}
+                    onPress={() => {
+                      if (eodReport) {
+                        PDFService.generateEodPDF(eodReport);
+                      } else {
+                        Alert.alert("Xato", "Hisobot ma'lumotlari yuklanmagan");
+                      }
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name="file-pdf-box"
+                        size={24}
+                        color={colors.success}
+                      />
+                      <Text
+                        style={[
+                          styles.submitBtnText,
+                          { color: colors.success },
+                        ]}
+                      >
+                        {Translations.uz.eodReport.exportPdf}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.closeReportBtn,
+                      {
+                        backgroundColor: colors.primary,
+                        marginTop: 0,
+                        paddingVertical: 12,
+                      },
+                    ]}
+                    onPress={() => setShowEodModal(false)}
+                  >
+                    <Text style={styles.submitBtnText}>Yopish</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.reportSection}>
+                  <Text
+                    style={[styles.reportLabel, { color: colors.secondary }]}
+                  >
+                    {Translations.uz.eodReport.financialSummary}
+                  </Text>
+                  <View style={styles.reportRow}>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      Jami Savdo:
+                    </Text>
+                    <Text
+                      style={[styles.reportValue, { color: colors.success }]}
+                    >
+                      {eodReport.stats.totalSales.toLocaleString()}{" "}
+                      {Translations.uz.common.currency}
+                    </Text>
+                  </View>
+                  <View style={styles.reportRow}>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      Naqd:
+                    </Text>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      {eodReport.stats.cashSales.toLocaleString()}{" "}
+                      {Translations.uz.common.currency}
+                    </Text>
+                  </View>
+                  <View style={styles.reportRow}>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      Terminal:
+                    </Text>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      {eodReport.stats.terminalSales.toLocaleString()}{" "}
+                      {Translations.uz.common.currency}
+                    </Text>
+                  </View>
+                  <View style={styles.reportRow}>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      Jami Xarajatlar:
+                    </Text>
+                    <Text
+                      style={[styles.reportValue, { color: colors.danger }]}
+                    >
+                      {eodReport.stats.totalExpenses.toLocaleString()}{" "}
+                      {Translations.uz.common.currency}
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  style={[styles.divider, { backgroundColor: colors.border }]}
+                />
+
+                <View style={styles.reportSection}>
+                  <Text
+                    style={[styles.reportLabel, { color: colors.secondary }]}
+                  >
+                    Kassa Reconciliation
+                  </Text>
+                  <View style={styles.reportRow}>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      Kutilgan Naqd:
+                    </Text>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      {eodReport.stats.expectedCash.toLocaleString()}{" "}
+                      {Translations.uz.common.currency}
+                    </Text>
+                  </View>
+                  <View style={styles.reportRow}>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      Haqiqiy Naqd:
+                    </Text>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      {eodReport.stats.actualCash.toLocaleString()}{" "}
+                      {Translations.uz.common.currency}
+                    </Text>
+                  </View>
+                  <View style={styles.reportRow}>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      Farq (Discrepancy):
+                    </Text>
+                    <Text
+                      style={[
+                        styles.reportValue,
+                        {
+                          color:
+                            eodReport.stats.discrepancy < 0
+                              ? colors.danger
+                              : colors.success,
+                        },
+                      ]}
+                    >
+                      {eodReport.stats.discrepancy.toLocaleString()}{" "}
+                      {Translations.uz.common.currency}
+                    </Text>
+                  </View>
+                </View>
+
+                {eodReport.expenses?.length > 0 && (
+                  <>
+                    <View
+                      style={[
+                        styles.divider,
+                        { backgroundColor: colors.border },
+                      ]}
+                    />
+                    <View style={styles.reportSection}>
+                      <Text
+                        style={[
+                          styles.reportLabel,
+                          { color: colors.secondary },
+                        ]}
+                      >
+                        Xarajatlar Tafsiloti
+                      </Text>
+                      {eodReport.expenses.map((exp: any, i: number) => (
+                        <View key={i} style={styles.reportRow}>
+                          <Text
+                            style={[styles.reportText, { color: colors.text }]}
+                          >
+                            {exp.title}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.reportValue,
+                              { color: colors.danger },
+                            ]}
+                          >
+                            -{exp.amount.toLocaleString()}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -685,6 +971,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
     gap: 6,
+    flexWrap: "wrap",
   },
   statusDot: {
     width: 8,
@@ -779,5 +1066,52 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 17,
     fontWeight: "bold",
+  },
+  reportSection: {
+    marginVertical: 14,
+    backgroundColor: "rgba(0,0,0,0.02)",
+    padding: 12,
+    borderRadius: 16,
+  },
+  reportLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 10,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  reportRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 12,
+  },
+  reportText: {
+    fontSize: 15,
+    flex: 1,
+  },
+  reportValue: {
+    fontWeight: "800",
+    fontSize: 16,
+    textAlign: "right",
+  },
+  divider: {
+    height: 1,
+    marginVertical: 4,
+    opacity: 0.5,
+  },
+  closeReportBtn: {
+    height: 56,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 24,
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
 });

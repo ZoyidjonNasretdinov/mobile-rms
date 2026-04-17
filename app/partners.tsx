@@ -12,7 +12,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+import { Storage } from "@/utils/storage";
 import { Translations } from "@/constants/translations";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
@@ -32,7 +32,7 @@ export default function PartnersScreen() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const token = await SecureStore.getItemAsync("userToken");
+      const token = await Storage.getItem("access_token");
       const res = await axios.get(`${API_BASE_URL}/partners`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -48,7 +48,7 @@ export default function PartnersScreen() {
     fetchData();
   }, []);
 
-  const PartnerCard = ({ name, contribution, share, trend }: any) => (
+  const PartnerCard = ({ item }: { item: any }) => (
     <View style={[styles.partnerCard, { backgroundColor: colors.card }]}>
       <View style={styles.partnerHeader}>
         <View style={styles.partnerInfo}>
@@ -57,29 +57,14 @@ export default function PartnersScreen() {
             numberOfLines={1}
             adjustsFontSizeToFit
           >
-            {name}
+            {item.name}
           </Text>
           <Text
             style={[styles.partnerSubtitle, { color: colors.secondary }]}
             numberOfLines={1}
             adjustsFontSizeToFit
           >
-            {t.profitShare}: {share}%
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.trendBadge,
-            { backgroundColor: colors.success + "15" },
-          ]}
-        >
-          <MaterialCommunityIcons
-            name="trending-up"
-            size={14}
-            color={colors.success}
-          />
-          <Text style={[styles.trendText, { color: colors.success }]}>
-            {trend}%
+            {t.profitShare}: {item.share}%
           </Text>
         </View>
       </View>
@@ -93,16 +78,21 @@ export default function PartnersScreen() {
             numberOfLines={1}
             adjustsFontSizeToFit
           >
-            {contribution} {c.currency}
+            {item.totalContribution?.toLocaleString() || 0} {c.currency}
           </Text>
         </View>
-        <TouchableOpacity
-          style={[styles.detailsBtn, { backgroundColor: colors.accent + "15" }]}
-        >
-          <Text style={[styles.detailsBtnText, { color: colors.accent }]}>
-            Tarix
+        <View style={styles.contribItem}>
+          <Text style={[styles.contribLabel, { color: colors.danger }]}>
+            {"Harajatlar"}
           </Text>
-        </TouchableOpacity>
+          <Text
+            style={[styles.contribValue, { color: colors.danger }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {item.totalExpenses?.toLocaleString() || 0} {c.currency}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -196,13 +186,7 @@ export default function PartnersScreen() {
           <ActivityIndicator size="large" color={colors.primary} />
         ) : (
           partners.map((partner) => (
-            <PartnerCard
-              key={partner._id}
-              name={partner.name}
-              contribution={partner.totalContribution.toLocaleString()}
-              share={partner.share}
-              trend="0"
-            />
+            <PartnerCard key={partner._id} item={partner} />
           ))
         )}
 
@@ -222,27 +206,41 @@ export default function PartnersScreen() {
           {t.recentActivity}
         </Text>
         <View style={[styles.activityList, { backgroundColor: colors.card }]}>
-          <View style={styles.activityItem}>
-            <MaterialCommunityIcons
-              name="arrow-up-circle"
-              size={20}
-              color={colors.success}
-            />
-            <Text style={[styles.activityText, { color: colors.text }]}>
-              {`${t.names.partner1} 5 mln so'm go'sht uchun kiritdi`}
+          {partners.flatMap((p) =>
+            (p.expenses || []).map((exp: any) => (
+              <View key={exp._id}>
+                <View style={styles.activityItem}>
+                  <MaterialCommunityIcons
+                    name="minus-circle-outline"
+                    size={20}
+                    color={colors.danger}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.activityText, { color: colors.text }]}>
+                      {`${exp.source}: ${exp.price?.toLocaleString()} ${c.currency} - ${exp.item}`}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: colors.secondary }}>
+                      {new Date(exp.date).toLocaleString()} | {exp.category}
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={[styles.divider, { backgroundColor: colors.border }]}
+                />
+              </View>
+            )),
+          )}
+          {partners.every((p) => !p.expenses || p.expenses.length === 0) && (
+            <Text
+              style={{
+                textAlign: "center",
+                color: colors.secondary,
+                padding: 20,
+              }}
+            >
+              Hozircha harajatlar yo'q
             </Text>
-          </View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <View style={styles.activityItem}>
-            <MaterialCommunityIcons
-              name="arrow-up-circle"
-              size={20}
-              color={colors.success}
-            />
-            <Text style={[styles.activityText, { color: colors.text }]}>
-              {`${t.names.partner2} ko'mir uchun 1.2 mln so'm kiritdi`}
-            </Text>
-          </View>
+          )}
         </View>
         <View style={styles.bottomSpace} />
       </ScrollView>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -18,6 +18,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
+import { socketService } from "@/utils/socket";
 
 import { Translations } from "@/constants/translations";
 
@@ -32,7 +33,11 @@ export default function StaffManagementScreen() {
   const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "inactive"
+  >("all");
 
   const fetchStaff = async () => {
     try {
@@ -40,7 +45,9 @@ export default function StaffManagementScreen() {
       const response = await axios.get(`${API_BASE_URL}/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setStaff(response.data);
+      // Filter out owners from the list
+      const nonOwners = response.data.filter((u: any) => u.role !== "owner");
+      setStaff(nonOwners);
     } catch (error) {
       console.error("Fetch staff error:", error);
       Alert.alert("Xato", "Xodimlarni yuklashda xatolik yuz berdi");
@@ -53,6 +60,13 @@ export default function StaffManagementScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchStaff();
+
+      const socket = socketService.getSocket();
+      socket.on("staffStatusChanged", fetchStaff);
+
+      return () => {
+        socket.off("staffStatusChanged", fetchStaff);
+      };
     }, []),
   );
 
@@ -96,11 +110,18 @@ export default function StaffManagementScreen() {
     ]);
   };
 
-  const filteredStaff = staff.filter(
-    (s) =>
+  const filteredStaff = staff.filter((s) => {
+    const matchesSearch =
       s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.phone.includes(searchQuery),
-  );
+      s.phone.includes(searchQuery);
+
+    const matchesFilter =
+      statusFilter === "all" ||
+      (statusFilter === "active" && s.isActive) ||
+      (statusFilter === "inactive" && !s.isActive);
+
+    return matchesSearch && matchesFilter;
+  });
 
   const activeCount = staff.filter((s) => s.isActive).length;
   const inactiveCount = staff.length - activeCount;
@@ -134,7 +155,20 @@ export default function StaffManagementScreen() {
               style={[styles.roleText, { color: colors.accent }]}
               numberOfLines={1}
             >
-              {item.role.charAt(0).toUpperCase() + item.role.slice(1)}
+              {item.role === "ofisiant"
+                ? Translations.uz.auth.waiter
+                : item.role === "kassier"
+                  ? "Kassir"
+                  : item.role === "oshpaz"
+                    ? "Oshpaz"
+                    : item.role === "shashlikchi"
+                      ? "Shashlikchi"
+                      : item.role === "salatchi"
+                        ? "Salatchi"
+                        : item.role === "bar"
+                          ? "Barman"
+                          : item.role.charAt(0).toUpperCase() +
+                            item.role.slice(1)}
             </Text>
           </View>
         </View>
@@ -176,16 +210,11 @@ export default function StaffManagementScreen() {
         <TouchableOpacity
           style={[
             styles.deactivateButton,
-            { backgroundColor: item.isActive ? colors.input : colors.success },
+            { backgroundColor: item.isActive ? colors.danger : colors.success },
           ]}
           onPress={() => toggleStatus(item._id, item.isActive)}
         >
-          <Text
-            style={[
-              styles.deactivateText,
-              { color: item.isActive ? colors.text : "white" },
-            ]}
-          >
+          <Text style={[styles.deactivateText, { color: "white" }]}>
             {item.isActive ? "Kemadi" : "Keldi"}
           </Text>
         </TouchableOpacity>
@@ -249,11 +278,18 @@ export default function StaffManagementScreen() {
               color="white"
             />
           </View>
-          <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={[styles.headerTitle, { color: colors.text }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {t.title}
             </Text>
-            <Text style={[styles.headerSubtitle, { color: colors.secondary }]}>
+            <Text
+              style={[styles.headerSubtitle, { color: colors.secondary }]}
+              numberOfLines={1}
+            >
               {t.totalStaff.replace("{count}", staff.length.toString())}
             </Text>
           </View>
@@ -289,14 +325,20 @@ export default function StaffManagementScreen() {
       </View>
 
       <View style={styles.statsRow}>
-        <View
+        <TouchableOpacity
           style={[
             styles.statBox,
             {
-              backgroundColor: colors.success + "05",
-              borderColor: colors.success + "20",
+              backgroundColor:
+                colors.success + (statusFilter === "active" ? "15" : "05"),
+              borderColor:
+                colors.success + (statusFilter === "active" ? "40" : "20"),
+              borderWidth: statusFilter === "active" ? 2 : 1,
             },
           ]}
+          onPress={() =>
+            setStatusFilter(statusFilter === "active" ? "all" : "active")
+          }
         >
           <Text style={[styles.statValue, { color: colors.success }]}>
             {activeCount}
@@ -304,15 +346,21 @@ export default function StaffManagementScreen() {
           <Text style={[styles.statLabel, { color: colors.success }]}>
             Aktiv
           </Text>
-        </View>
-        <View
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[
             styles.statBox,
             {
-              backgroundColor: colors.danger + "05",
-              borderColor: colors.danger + "20",
+              backgroundColor:
+                colors.danger + (statusFilter === "inactive" ? "15" : "05"),
+              borderColor:
+                colors.danger + (statusFilter === "inactive" ? "40" : "20"),
+              borderWidth: statusFilter === "inactive" ? 2 : 1,
             },
           ]}
+          onPress={() =>
+            setStatusFilter(statusFilter === "inactive" ? "all" : "inactive")
+          }
         >
           <Text style={[styles.statValue, { color: colors.danger }]}>
             {inactiveCount}
@@ -320,7 +368,7 @@ export default function StaffManagementScreen() {
           <Text style={[styles.statLabel, { color: colors.danger }]}>
             Kemaganlar
           </Text>
-        </View>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.statBox,
@@ -330,6 +378,10 @@ export default function StaffManagementScreen() {
             },
           ]}
           onPress={() => {
+            if (staff.length === 0) {
+              Alert.alert("Ma'lumot yo'q", "Xodimlar ro'yxati bo'sh");
+              return;
+            }
             const allActive = staff.every((s) => s.isActive);
             Alert.alert(
               allActive ? "Barcha kemadi" : "Barcha keldi",
@@ -342,15 +394,30 @@ export default function StaffManagementScreen() {
                   text: allActive ? "Ha, kemadi" : "Ha, keldi",
                   onPress: async () => {
                     try {
+                      setBulkLoading(true);
                       const token = await Storage.getItem("access_token");
                       await axios.patch(
                         `${API_BASE_URL}/users/bulk-status`,
                         { isActive: !allActive },
                         { headers: { Authorization: `Bearer ${token}` } },
                       );
-                      fetchStaff();
-                    } catch {
-                      Alert.alert("Xato", "Amalni bajarib bo'lmadi");
+                      await fetchStaff();
+                      Alert.alert(
+                        "Muvaffaqiyatli",
+                        "Xodimlar holati yangilandi",
+                      );
+                    } catch (err: any) {
+                      console.error(
+                        "Bulk update error:",
+                        err?.response?.data || err.message,
+                      );
+                      Alert.alert(
+                        "Xato",
+                        "Amalni bajarib bo'lmadi: " +
+                          (err?.response?.data?.message || err.message),
+                      );
+                    } finally {
+                      setBulkLoading(false);
                     }
                   },
                 },
@@ -358,18 +425,26 @@ export default function StaffManagementScreen() {
             );
           }}
         >
-          <MaterialCommunityIcons
-            name={
-              staff.every((s) => s.isActive)
-                ? "account-off-outline"
-                : "account-check-outline"
-            }
-            size={24}
-            color={colors.primary}
-          />
-          <Text style={[styles.statLabel, { color: colors.primary }]}>
-            {staff.every((s) => s.isActive) ? "Barcha kemadi" : "Barcha keldi"}
-          </Text>
+          {bulkLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <>
+              <MaterialCommunityIcons
+                name={
+                  staff.length > 0 && staff.every((s) => s.isActive)
+                    ? "account-off-outline"
+                    : "account-check-outline"
+                }
+                size={24}
+                color={colors.primary}
+              />
+              <Text style={[styles.statLabel, { color: colors.primary }]}>
+                {staff.length > 0 && staff.every((s) => s.isActive)
+                  ? "Barcha kemadi"
+                  : "Barcha keldi"}
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
 

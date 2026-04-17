@@ -46,6 +46,7 @@ export default function CreateStaffScreen() {
 
   const roles = [
     { label: Translations.uz.auth.waiter, value: "ofisiant" },
+    { label: "Kassir", value: "kassier" },
     { label: "Oshpaz", value: "oshpaz" },
     { label: "Shashlikchi", value: "shashlikchi" },
     { label: "Salatchi", value: "salatchi" },

@@ -267,6 +267,9 @@ export default function WaiterStationScreen() {
       fetchData();
     });
 
+    socket.on("stockUpdated", fetchData);
+    socket.on("staffStockUpdated", fetchData);
+
     return () => {
       socket.off("orderCreated");
       socket.off("orderUpdated");
@@ -274,6 +277,8 @@ export default function WaiterStationScreen() {
       socket.off("itemCooking");
       socket.off("orderPaid");
       socket.off("tableUpdated");
+      socket.off("stockUpdated");
+      socket.off("staffStockUpdated");
     };
   }, [fetchData, colors.primary, colors.success, colors.warning]);
 

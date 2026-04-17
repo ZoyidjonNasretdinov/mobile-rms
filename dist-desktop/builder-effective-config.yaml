@@ -1,0 +1,15 @@
+directories:
+  output: dist-desktop
+  buildResources: build
+appId: com.rms.smart.boshqaruv
+productName: RMS Desktop
+files:
+  - filter:
+      - dist/**/*
+      - electron/**/*
+      - assets/**/*
+mac:
+  category: public.app-category.business
+win:
+  target: nsis
+electronVersion: 41.2.1

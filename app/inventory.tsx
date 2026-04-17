@@ -22,7 +22,7 @@ import { Translations } from "@/constants/translations";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
-import { io } from "socket.io-client";
+import { socketService } from "@/utils/socket";
 
 const t = Translations.uz.inventory;
 const common = Translations.uz.common;
@@ -91,7 +91,7 @@ export default function InventoryStatusScreen() {
   );
 
   useEffect(() => {
-    const socket = io(API_BASE_URL, { transports: ["websocket"] });
+    const socket = socketService.getSocket();
     socket.on("stockUpdated", () => {
       fetchData();
     });
@@ -99,7 +99,8 @@ export default function InventoryStatusScreen() {
       fetchData();
     });
     return () => {
-      socket.disconnect();
+      socket.off("stockUpdated");
+      socket.off("staffStockUpdated");
     };
   }, []);
 

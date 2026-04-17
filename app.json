@@ -8,7 +8,8 @@
     "scheme": "rms",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rms.smart.boshqaruv"
     },
     "android": {
       "package": "com.rms.smart.boshqaruv",

@@ -9,6 +9,9 @@ import { useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { Storage } from "@/utils/storage";
 import "react-native-reanimated";
+import axios from "axios";
+import { socketService } from "@/utils/socket";
+import { CONFIG } from "@/constants/config";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
@@ -37,15 +40,37 @@ export default function RootLayout() {
           const userStr = await Storage.getItem("user");
           if (userStr) {
             const user = JSON.parse(userStr);
+
+            // Redirect inactive staff
+            if (user.role !== "owner" && user.isActive === false) {
+              router.replace("/inactive-staff");
+              return;
+            }
+
             if (user.role === "owner") {
               router.replace("/dashboard");
             } else if (user.role === "ofisiant") {
               router.replace("/waiter");
+            } else if (user.role === "kassier") {
+              router.replace("/cashier");
             } else {
               router.replace("/kitchen");
             }
           } else {
             router.replace("/dashboard");
+          }
+        } else if (token && !inAuthGroup) {
+          // Check if user became inactive mid-session
+          const userStr = await Storage.getItem("user");
+          if (userStr) {
+            const user = JSON.parse(userStr);
+            if (
+              user.role !== "owner" &&
+              user.isActive === false &&
+              segments[0] !== "inactive-staff"
+            ) {
+              router.replace("/inactive-staff");
+            }
           }
         }
       } catch (e) {
@@ -56,6 +81,40 @@ export default function RootLayout() {
     };
 
     checkAuth();
+
+    const socket = socketService.getSocket();
+    const handleStatusChange = async () => {
+      try {
+        const token = await Storage.getItem("access_token");
+        if (token) {
+          const res = await axios.get(`${CONFIG.API_BASE_URL}/users/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.data) {
+            await Storage.setItem("user", JSON.stringify(res.data));
+            // Trigger auth check by changing segments if needed,
+            // but the next checkAuth or segment change will handle it.
+            // For immediate effect:
+            const user = res.data;
+            if (
+              user.role !== "owner" &&
+              user.isActive === false &&
+              segments[0] !== "inactive-staff"
+            ) {
+              router.replace("/inactive-staff");
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Layout status update error:", err);
+      }
+    };
+
+    socket.on("staffStatusChanged", handleStatusChange);
+
+    return () => {
+      socket.off("staffStatusChanged", handleStatusChange);
+    };
   }, [segments]);
 
   if (!isReady) {

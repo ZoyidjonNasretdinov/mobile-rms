@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -20,6 +21,15 @@ import axios from "axios";
 import { StatusBar } from "expo-status-bar";
 import { Colors } from "../constants/theme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import Animated, {
+  FadeInUp,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withSequence,
+} from "react-native-reanimated";
 
 import { Translations } from "../constants/translations";
 
@@ -33,12 +43,19 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState("");
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
+
   const router = useRouter();
   const passwordRef = useRef<any>(null);
 
+  // Reanimated shared values
+  const buttonScale = useSharedValue(1);
+
+  const buttonStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }],
+  }));
+
   const handlePhoneChange = (text: string) => {
-    // Just keep the text as is or filter non-digits if needed,
-    // but don't force formatting during typing.
     setPhone(text);
   };
 
@@ -46,12 +63,14 @@ export default function LoginScreen() {
     setLocalError("");
     if (!phone || !password) {
       setLocalError(t.errorFillFields);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
     setLoading(true);
+    buttonScale.value = withSequence(withSpring(0.95), withSpring(1));
+
     try {
-      // Normalize phone: strip spaces and other non-digits, then add "+"
       const cleaned = phone.replace(/\D/g, "");
       const normalizedPhone = "+" + cleaned;
 
@@ -64,7 +83,16 @@ export default function LoginScreen() {
       await Storage.setItem("access_token", access_token);
       await Storage.setItem("user", JSON.stringify(user));
 
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
       const userRole = user.role?.toLowerCase();
+
+      // Check if user is active (attendance check)
+      if (userRole !== "owner" && user.isActive === false) {
+        router.replace("/inactive-staff");
+        return;
+      }
+
       if (userRole === "owner") {
         router.replace("/dashboard");
       } else if (userRole === "ofisiant") {
@@ -75,9 +103,9 @@ export default function LoginScreen() {
         router.replace("/kitchen");
       }
     } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const errorMsg = error.response?.data?.message || t.errorLogin;
       setLocalError(errorMsg);
-      // Fallback alert
       Alert.alert(t.error, errorMsg);
     } finally {
       setLoading(false);
@@ -95,17 +123,23 @@ export default function LoginScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="always"
+          keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.headerContainer}>
+          <Animated.View
+            entering={FadeInUp.delay(200).duration(800)}
+            style={styles.headerContainer}
+          >
             <View style={styles.logoIconContainer}>
-              <MaterialCommunityIcons name="chef-hat" size={40} color="white" />
+              <MaterialCommunityIcons name="chef-hat" size={42} color="white" />
             </View>
             <Text style={styles.title}>{t.title}</Text>
             <Text style={styles.subtitle}>{t.subtitle}</Text>
-          </View>
+          </Animated.View>
 
-          <View style={styles.card}>
+          <Animated.View
+            entering={FadeInDown.delay(400).duration(800)}
+            style={styles.card}
+          >
             <Text style={styles.loginTitle}>{t.loginTitle}</Text>
             <Text style={styles.loginSubtitle}>{t.loginSubtitle}</Text>
 
@@ -114,13 +148,17 @@ export default function LoginScreen() {
               <View
                 style={[
                   styles.inputContainer,
-                  // Removed conditional focus styling to prevent re-renders
+                  focusedInput === "phone" && styles.inputContainerFocused,
                 ]}
               >
                 <MaterialCommunityIcons
                   name="phone-outline"
                   size={20}
-                  color={Colors.light.secondary}
+                  color={
+                    focusedInput === "phone"
+                      ? Colors.light.primary
+                      : Colors.light.secondary
+                  }
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -130,12 +168,15 @@ export default function LoginScreen() {
                   keyboardType="phone-pad"
                   value={phone}
                   onChangeText={handlePhoneChange}
+                  onFocus={() => setFocusedInput("phone")}
+                  onBlur={() => setFocusedInput(null)}
                   autoCapitalize="none"
                   autoComplete="off"
                   importantForAutofill="no"
                   textContentType="none"
                   maxLength={17}
                   returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
                 />
               </View>
 
@@ -143,13 +184,17 @@ export default function LoginScreen() {
               <View
                 style={[
                   styles.inputContainer,
-                  // Removed conditional focus styling to prevent re-renders
+                  focusedInput === "password" && styles.inputContainerFocused,
                 ]}
               >
                 <MaterialCommunityIcons
                   name="lock-outline"
                   size={20}
-                  color={Colors.light.secondary}
+                  color={
+                    focusedInput === "password"
+                      ? Colors.light.primary
+                      : Colors.light.secondary
+                  }
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -159,14 +204,20 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
+                  onFocus={() => setFocusedInput("password")}
+                  onBlur={() => setFocusedInput(null)}
                   autoComplete="off"
                   importantForAutofill="no"
                   textContentType="none"
                   ref={passwordRef}
                   returnKeyType="done"
+                  onSubmitEditing={handleLogin}
                 />
                 <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
+                  onPress={() => {
+                    setShowPassword(!showPassword);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
                   style={styles.eyeIcon}
                 >
                   <MaterialCommunityIcons
@@ -188,19 +239,22 @@ export default function LoginScreen() {
                 </View>
               ) : null}
 
-              <TouchableOpacity
-                style={[styles.button, loading && styles.buttonDisabled]}
-                onPress={handleLogin}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.buttonText}>{t.signIn}</Text>
-                )}
-              </TouchableOpacity>
+              <Animated.View style={buttonStyle}>
+                <TouchableOpacity
+                  style={[styles.button, loading && styles.buttonDisabled]}
+                  onPress={handleLogin}
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={styles.buttonText}>{t.signIn}</Text>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
             </View>
-          </View>
+          </Animated.View>
 
           <View style={styles.footer}>
             <TouchableOpacity
@@ -224,7 +278,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: "#F8FAFC", // Sleek off-white/grey background
   },
   flex: {
     flex: 1,
@@ -232,97 +286,96 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     padding: 24,
-    paddingTop: Platform.OS === "android" ? 60 : 40,
-    paddingBottom: 150,
+    paddingTop: Platform.OS === "android" ? 70 : 50,
+    paddingBottom: 100,
   },
   headerContainer: {
     alignItems: "center",
     marginBottom: 40,
   },
   logoIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
+    width: 84,
+    height: 84,
+    borderRadius: 28,
     backgroundColor: Colors.light.primary,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 20,
     ...Platform.select({
       ios: {
         shadowColor: Colors.light.primary,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.2,
-        shadowRadius: 15,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
       },
       android: {
-        elevation: 8,
-      },
-      web: {
-        boxShadow: `0px 10px 15px ${Colors.light.primary}33`,
+        elevation: 12,
       },
     }),
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: Colors.light.text,
+    fontSize: 30,
+    fontWeight: "800",
+    color: "#1E293B",
     marginBottom: 8,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 16,
-    color: Colors.light.secondary,
+    fontSize: 15,
+    color: "#64748B",
     textAlign: "center",
+    lineHeight: 22,
+    maxWidth: "80%",
   },
   card: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 24,
-    padding: 24,
+    backgroundColor: "white",
+    borderRadius: 32,
+    padding: 28,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.08,
+        shadowRadius: 30,
       },
       android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.05)",
+        elevation: 10,
       },
     }),
   },
   loginTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
-    color: Colors.light.text,
-    marginBottom: 8,
+    color: "#0F172A",
+    marginBottom: 6,
   },
   loginSubtitle: {
     fontSize: 14,
-    color: Colors.light.secondary,
+    color: "#64748B",
     marginBottom: 32,
   },
   form: {
-    gap: 16,
+    gap: 18,
   },
   label: {
     fontSize: 14,
-    fontWeight: "600",
-    color: Colors.light.text,
-    marginBottom: 8,
+    fontWeight: "700",
+    color: "#334155",
+    marginBottom: 4,
+    marginLeft: 4,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.light.input,
-    borderRadius: 16,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 18,
     paddingHorizontal: 16,
-    borderWidth: 1.5,
-    borderColor: Colors.light.border,
+    borderWidth: 2,
+    borderColor: "transparent",
+    height: 60,
   },
   inputContainerFocused: {
-    borderColor: Colors.light.primary,
+    borderColor: Colors.light.primary + "30",
     backgroundColor: "white",
     ...Platform.select({
       ios: {
@@ -334,9 +387,6 @@ const styles = StyleSheet.create({
       android: {
         elevation: 2,
       },
-      web: {
-        boxShadow: `0px 4px 12px ${Colors.light.primary}1A`,
-      },
     }),
   },
   inputIcon: {
@@ -344,81 +394,70 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 56,
+    height: "100%",
     fontSize: 16,
-    color: Colors.light.text,
+    color: "#0F172A",
+    fontWeight: "500",
   },
   eyeIcon: {
     padding: 8,
   },
   button: {
     backgroundColor: Colors.light.primary,
-    borderRadius: 16,
-    height: 56,
+    borderRadius: 20,
+    height: 60,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 16,
+    marginTop: 20,
     ...Platform.select({
       ios: {
         shadowColor: Colors.light.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
       },
       android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: `0px 4px 8px ${Colors.light.primary}33`,
+        elevation: 8,
       },
     }),
   },
   buttonDisabled: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   buttonText: {
     color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
   footer: {
-    marginTop: 32,
+    marginTop: 40,
     alignItems: "center",
   },
   footerText: {
     fontSize: 14,
-    color: Colors.light.secondary,
+    color: "#94A3B8",
     marginBottom: 12,
     fontWeight: "600",
   },
-  demoRow: {
-    flexDirection: "row",
-    marginBottom: 4,
-  },
-  demoType: {
-    fontSize: 13,
-    color: Colors.light.secondary,
-    fontWeight: "600",
-    marginRight: 6,
-  },
   demoEmail: {
-    fontSize: 13,
-    color: Colors.light.secondary,
+    fontSize: 14,
+    color: "#64748B",
   },
   errorContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF1F0",
-    padding: 12,
-    borderRadius: 12,
-    gap: 8,
+    backgroundColor: "#FEF2F2",
+    padding: 14,
+    borderRadius: 16,
+    gap: 10,
     borderWidth: 1,
-    borderColor: "#FFA39E",
+    borderColor: "#FCA5A5",
   },
   errorText: {
-    color: "#FF4D4F",
+    color: "#991B1B",
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "600",
     flex: 1,
   },
 });

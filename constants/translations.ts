@@ -12,6 +12,7 @@ export const Translations = {
       demoAccounts: "Demo Hisoblar:",
       owner: "Rahbar:",
       waiter: "Ofitsiant:",
+      cashier: "Kassir:",
       error: "Xato",
       errorFillFields: "Iltimos, telefon raqami va parolni kiriting",
       errorLogin: "Login xatosi",
