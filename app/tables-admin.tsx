@@ -17,6 +17,7 @@ import { useRouter } from "expo-router";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
+import { socketService } from "@/utils/socket";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
@@ -64,6 +65,17 @@ export default function TablesAdminScreen() {
 
   useEffect(() => {
     fetchTables();
+
+    const socket = socketService.getSocket();
+    socket.on('tableCreated', fetchTables);
+    socket.on('tableUpdated', fetchTables);
+    socket.on('tableDeleted', fetchTables);
+
+    return () => {
+      socket.off('tableCreated', fetchTables);
+      socket.off('tableUpdated', fetchTables);
+      socket.off('tableDeleted', fetchTables);
+    };
   }, []);
 
   const onRefresh = () => {

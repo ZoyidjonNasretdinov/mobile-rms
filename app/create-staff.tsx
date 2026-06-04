@@ -38,9 +38,12 @@ export default function CreateStaffScreen() {
 
   const [form, setForm] = useState({
     fullName: (params.fullName as string) || "",
-    phone: (params.phone as string) || "",
+    phone: (params.phoneNumber as string) || (params.phone as string) || "",
     password: "",
     role: (params.role as string) || "",
+    extraRoles: (params.extraRoles as string)
+      ? (params.extraRoles as string).split(",")
+      : [],
   });
   const [loading, setLoading] = useState(false);
 
@@ -52,6 +55,16 @@ export default function CreateStaffScreen() {
     { label: "Salatchi", value: "salatchi" },
     { label: "Barman", value: "bar" },
   ];
+
+  const toggleExtraRole = (role: string) => {
+    if (form.role === role) return;
+    setForm((prev) => {
+      const extraRoles = prev.extraRoles.includes(role)
+        ? prev.extraRoles.filter((r) => r !== role)
+        : [...prev.extraRoles, role];
+      return { ...prev, extraRoles };
+    });
+  };
 
   const handleSubmit = async () => {
     if (
@@ -69,29 +82,23 @@ export default function CreateStaffScreen() {
       const token = await Storage.getItem("access_token");
       const normalizedPhone = form.phone.replace(/\D/g, "");
 
-      if (isEditing) {
-        const updateData: any = {
-          fullName: form.fullName,
-          phone: normalizedPhone,
-          role: form.role,
-        };
-        if (form.password) updateData.password = form.password;
+      const data: any = {
+        fullName: form.fullName,
+        phoneNumber: normalizedPhone,
+        role: form.role,
+        extraRoles: form.extraRoles,
+      };
+      if (form.password) data.password = form.password;
 
-        await axios.patch(`${API_BASE_URL}/users/${params.id}`, updateData, {
+      if (isEditing) {
+        await axios.patch(`${API_BASE_URL}/users/${params.id}`, data, {
           headers: { Authorization: `Bearer ${token}` },
         });
         Alert.alert("Muvaffaqiyat", "Xodim ma'lumotlari yangilandi");
       } else {
-        await axios.post(
-          `${API_BASE_URL}/users`,
-          {
-            ...form,
-            phone: normalizedPhone,
-          },
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
+        await axios.post(`${API_BASE_URL}/users`, data, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         Alert.alert("Muvaffaqiyat", "Yangi xodim qo'shildi");
       }
       router.back();
@@ -224,23 +231,31 @@ export default function CreateStaffScreen() {
 
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>
-                {t.selectRole}
+                Asosiy rol (Primary Role)
               </Text>
               <View style={styles.rolesGrid}>
                 {roles.map((item) => (
                   <TouchableOpacity
                     key={item.value}
-                    onPress={() => setForm({ ...form, role: item.value })}
+                    onPress={() =>
+                      setForm({
+                        ...form,
+                        role: item.value,
+                        extraRoles: form.extraRoles.filter(
+                          (r) => r !== item.value,
+                        ),
+                      })
+                    }
                     style={[
                       styles.roleBtn,
                       {
                         backgroundColor:
                           form.role === item.value
-                            ? colors.accent + "20"
+                            ? colors.primary + "20"
                             : colors.card,
                         borderColor:
                           form.role === item.value
-                            ? colors.accent
+                            ? colors.primary
                             : colors.border,
                       },
                     ]}
@@ -251,8 +266,48 @@ export default function CreateStaffScreen() {
                         {
                           color:
                             form.role === item.value
-                              ? colors.accent
+                              ? colors.primary
                               : colors.text,
+                        },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>
+                Qo'shimcha rollar (Extra Roles)
+              </Text>
+              <View style={styles.rolesGrid}>
+                {roles.map((item) => (
+                  <TouchableOpacity
+                    key={item.value}
+                    disabled={form.role === item.value}
+                    onPress={() => toggleExtraRole(item.value)}
+                    style={[
+                      styles.roleBtn,
+                      {
+                        backgroundColor: form.extraRoles.includes(item.value)
+                          ? colors.accent + "20"
+                          : colors.card,
+                        borderColor: form.extraRoles.includes(item.value)
+                          ? colors.accent
+                          : colors.border,
+                        opacity: form.role === item.value ? 0.4 : 1,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.roleBtnText,
+                        {
+                          color: form.extraRoles.includes(item.value)
+                            ? colors.accent
+                            : colors.text,
                         },
                       ]}
                     >

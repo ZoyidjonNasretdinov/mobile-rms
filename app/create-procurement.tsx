@@ -23,7 +23,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter } from "expo-router";
 // import { Translations } from "@/constants/translations";
 import { Storage } from "@/utils/storage";
-import axios from "axios";
+import api from "@/utils/api";
 import { CONFIG } from "@/constants/config";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
@@ -74,7 +74,7 @@ export default function CreateProcurementScreen() {
   const [form, setForm] = useState({
     item: "",
     itemId: "",
-    price: "",
+    unitPrice: "",
     quantity: "",
     unit: "ta",
     category: "",
@@ -83,10 +83,8 @@ export default function CreateProcurementScreen() {
   });
 
   const sources = [
-    { label: "Kassir", value: "cashier" },
+    { label: "Kassa", value: "cashier" },
     { label: "Direktor", value: "owner" },
-    { label: "Hamkor 1", value: "partner1" },
-    { label: "Hamkor 2", value: "partner2" },
   ];
 
   // const units = ["kg", "litr", "ta", "bog'", "blok", "metr"];
@@ -94,49 +92,48 @@ export default function CreateProcurementScreen() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = await Storage.getItem("access_token");
-        const headers = { Authorization: `Bearer ${token}` };
         const [itemsRes, catRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/inventory/products`, { headers }),
-          axios.get(`${API_BASE_URL}/inventory/categories`, { headers }),
+          api.get(`/inventory/products`),
+          api.get(`/inventory/categories`),
         ]);
         setItems(itemsRes.data);
         setCategories(catRes.data);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Fetch data error:", error);
-      } finally {
-        // setFetchingData(false);
+        // silent fail - foydalanuvchi o'zgartirishni saqlaganda xato ko'radi
       }
     };
     fetchData();
   }, []);
 
   const handleSave = async () => {
-    if (!form.item || !form.price || !form.quantity || !form.category) {
+    if (!form.item || !form.unitPrice || !form.quantity || !form.category) {
       Alert.alert("Xato", "Barcha majdonlarni to'ldiring");
       return;
     }
 
-    const parsedPrice = parseFloat(form.price);
+    const parsedUnitPrice = parseFloat(form.unitPrice);
     const parsedQty = parseFloat(form.quantity);
 
-    if (isNaN(parsedPrice) || isNaN(parsedQty)) {
+    if (isNaN(parsedUnitPrice) || isNaN(parsedQty)) {
       Alert.alert("Xato", "Narxi va miqdori raqam bo'lishi kerak");
       return;
     }
 
+    const totalPrice = parsedUnitPrice * parsedQty;
+
     setLoading(true);
     try {
-      const token = await Storage.getItem("access_token");
-      await axios.post(
-        `${API_BASE_URL}/procurement`,
-        {
-          ...form,
-          price: parsedPrice,
-          quantity: parsedQty,
-        },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      await api.post(`/procurement`, {
+        item: form.item,
+        itemId: form.itemId || undefined,
+        quantity: parsedQty,
+        unit: form.unit,
+        category: form.category,
+        supplier: form.supplier,
+        source: form.source,
+        price: totalPrice,
+      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Muvaffaqiyat", "Xarid saqlandi");
       router.back();
@@ -145,9 +142,7 @@ export default function CreateProcurementScreen() {
         "Procurement Create Error:",
         error.response?.data || error.message,
       );
-      const errMsg =
-        error.response?.data?.message || "Saqlashda xatolik yuz berdi";
-      Alert.alert("Xato", Array.isArray(errMsg) ? errMsg.join(", ") : errMsg);
+      Alert.alert("Xato", error.userMessage || "Saqlashda xatolik yuz berdi");
     } finally {
       setLoading(false);
     }
@@ -299,7 +294,7 @@ export default function CreateProcurementScreen() {
               </View>
               <View style={[styles.inputGroup, { flex: 1.2 }]}>
                 <Text style={[styles.label, { color: colors.secondary }]}>
-                  Narxi (Jami)
+                  Birlik narxi (1 {form.unit} uchun)
                 </Text>
                 <View
                   style={[
@@ -315,8 +310,8 @@ export default function CreateProcurementScreen() {
                     placeholder="0"
                     placeholderTextColor={colors.secondary}
                     keyboardType="numeric"
-                    value={form.price}
-                    onChangeText={(val) => setForm({ ...form, price: val })}
+                    value={form.unitPrice}
+                    onChangeText={(val) => setForm({ ...form, unitPrice: val })}
                   />
                   <Text style={[styles.unitBadge, { color: colors.secondary }]}>
                     UZS
@@ -324,6 +319,15 @@ export default function CreateProcurementScreen() {
                 </View>
               </View>
             </View>
+
+            {(form.quantity && form.unitPrice) ? (
+              <View style={{ alignItems: 'flex-end', marginTop: -12 }}>
+                <Text style={{ fontSize: 13, color: colors.secondary, fontWeight: '600' }}>Jami hisoblangan summa:</Text>
+                <Text style={{ fontSize: 20, color: colors.primary, fontWeight: '800', marginTop: 2 }}>
+                  {(parseFloat(form.quantity) * parseFloat(form.unitPrice)).toLocaleString()} UZS
+                </Text>
+              </View>
+            ) : null}
 
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.secondary }]}>

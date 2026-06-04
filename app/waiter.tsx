@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   StyleSheet,
   View,
@@ -73,28 +74,9 @@ export default function WaiterStationScreen() {
         setSelectedFloor(floors[0]);
       }
 
-      // Fetch Today's Orders
-      const now = new Date();
-      const startOfDay = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-      ).toISOString();
-      const endOfDay = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        23,
-        59,
-        59,
-      ).toISOString();
-
-      const ordersRes = await axios.get(
-        `${API_BASE_URL}/orders?startDate=${startOfDay}&endDate=${endOfDay}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const ordersRes = await axios.get(`${API_BASE_URL}/orders`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setOrders(ordersRes.data);
 
       // Check shift status
@@ -114,21 +96,27 @@ export default function WaiterStationScreen() {
     }
   }, [selectedFloor]);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
+
   useEffect(() => {
     fetchData();
     const socket = socketService.getSocket();
 
-    socket.on("orderCreated", (newOrder: any) => {
+    const handleOrderCreated = (newOrder: any) => {
       setOrders((prev) => [newOrder, ...prev]);
-    });
+    };
 
-    socket.on("orderUpdated", (updatedOrder: any) => {
+    const handleOrderUpdated = (updatedOrder: any) => {
       setOrders((prev) =>
         prev.map((o) => (o._id === updatedOrder._id ? updatedOrder : o)),
       );
-    });
+    };
 
-    socket.on("itemReady", (data: any) => {
+    const handleItemReady = (data: any) => {
       const currentUser = userRef.current;
       const currentUserId = currentUser?.id || currentUser?._id;
       if (!data.waiterId || data.waiterId === currentUserId) {
@@ -161,9 +149,9 @@ export default function WaiterStationScreen() {
           cancelable: true,
         });
       }
-    });
+    };
 
-    socket.on("itemCooking", (data: any) => {
+    const handleItemCooking = (data: any) => {
       const currentUser = userRef.current;
       const currentUserId = currentUser?.id || currentUser?._id;
       if (!data.waiterId || data.waiterId === currentUserId) {
@@ -190,9 +178,9 @@ export default function WaiterStationScreen() {
         );
         setUnreadCount((c) => c + 1);
       }
-    });
+    };
 
-    socket.on("orderPaid", (data: any) => {
+    const handleOrderPaid = (data: any) => {
       const currentUser = userRef.current;
       const currentUserId = currentUser?.id || currentUser?._id;
       if (!data.waiterId || data.waiterId === currentUserId) {
@@ -221,15 +209,15 @@ export default function WaiterStationScreen() {
         setUnreadCount((c) => c + 1);
         fetchData();
       }
-    });
+    };
 
-    socket.on("tableUpdated", (updatedTable: any) => {
+    const handleTableUpdated = (updatedTable: any) => {
       setTables((prev) =>
         prev.map((t) => (t._id === updatedTable._id ? updatedTable : t)),
       );
-    });
+    };
 
-    socket.on("dayStarted", () => {
+    const handleDayStarted = () => {
       const msg = "Ish kuni boshlandi. Baraka bersin!";
       notificationService.notify(msg, Haptics.NotificationFeedbackType.Success);
       setNotifications((prev) => [
@@ -246,9 +234,9 @@ export default function WaiterStationScreen() {
         ...prev,
       ]);
       fetchData();
-    });
+    };
 
-    socket.on("dayEnded", () => {
+    const handleDayEnded = () => {
       const msg = "Ish kuni yakunlandi. Charchamang!";
       notificationService.notify(msg, Haptics.NotificationFeedbackType.Warning);
       setNotifications((prev) => [
@@ -265,27 +253,38 @@ export default function WaiterStationScreen() {
         ...prev,
       ]);
       fetchData();
-    });
+    };
 
-    socket.on("stockUpdated", fetchData);
-    socket.on("staffStockUpdated", fetchData);
+    const handleStockUpdated = () => fetchData();
+    const handleStaffStockUpdated = () => fetchData();
+
+    socket.on("orderCreated", handleOrderCreated);
+    socket.on("orderUpdated", handleOrderUpdated);
+    socket.on("itemReady", handleItemReady);
+    socket.on("itemCooking", handleItemCooking);
+    socket.on("orderPaid", handleOrderPaid);
+    socket.on("tableUpdated", handleTableUpdated);
+    socket.on("dayStarted", handleDayStarted);
+    socket.on("dayEnded", handleDayEnded);
+    socket.on("stockUpdated", handleStockUpdated);
+    socket.on("staffStockUpdated", handleStaffStockUpdated);
 
     return () => {
-      socket.off("orderCreated");
-      socket.off("orderUpdated");
-      socket.off("itemReady");
-      socket.off("itemCooking");
-      socket.off("orderPaid");
-      socket.off("tableUpdated");
-      socket.off("stockUpdated");
-      socket.off("staffStockUpdated");
+      socket.off("orderCreated", handleOrderCreated);
+      socket.off("orderUpdated", handleOrderUpdated);
+      socket.off("itemReady", handleItemReady);
+      socket.off("itemCooking", handleItemCooking);
+      socket.off("orderPaid", handleOrderPaid);
+      socket.off("tableUpdated", handleTableUpdated);
+      socket.off("dayStarted", handleDayStarted);
+      socket.off("dayEnded", handleDayEnded);
+      socket.off("stockUpdated", handleStockUpdated);
+      socket.off("staffStockUpdated", handleStaffStockUpdated);
     };
   }, [fetchData, colors.primary, colors.success, colors.warning]);
 
-  const handleLogout = async () => {
-    await Storage.removeItem("access_token");
-    await Storage.removeItem("user");
-    router.replace("/login");
+  const handleHeaderAction = async () => {
+    router.back();
   };
 
   const onRefresh = () => {
@@ -301,7 +300,13 @@ export default function WaiterStationScreen() {
   );
 
   const myUserId = user?.id || user?._id;
-  const myOrders = orders.filter((o) => o.waiterId === myUserId);
+  const myOrders = orders
+    .filter((o) => o.waiterId === myUserId)
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt || b.createdAt).getTime() -
+        new Date(a.updatedAt || a.createdAt).getTime(),
+    );
   const floors = [...new Set(tables.map((t: any) => t.floor || 1))].sort(
     (a: any, b: any) => (a as number) - (b as number),
   ) as number[];
@@ -344,9 +349,10 @@ export default function WaiterStationScreen() {
   };
 
   const TableCard = ({ table }: { table: any }) => {
-    const tableOrders = orders.filter(
-      (o) => o.tableName === table.number.toString(),
-    );
+    const tableOrders = orders.filter((o) => {
+      const oTableId = typeof o.tableId === 'object' && o.tableId ? o.tableId._id : o.tableId;
+      return oTableId === table._id;
+    });
     const activeOrder = tableOrders.find(
       (o) => o.status !== "Paid" && o.status !== "Cancelled",
     );
@@ -513,17 +519,26 @@ export default function WaiterStationScreen() {
               </View>
             </View>
             {/* Total amount prominently shown */}
-            <Text
-              style={{
-                color: statusColor,
-                fontSize: 15,
-                fontWeight: "800",
-                marginTop: 6,
-              }}
-            >
-              {activeOrder.totalAmount?.toLocaleString()}{" "}
-              {Translations.uz.common.currency}
-            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 6 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 10, color: colors.secondary, marginBottom: 2 }}>
+                  Buyurtma oldi:
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }} numberOfLines={1}>
+                  {activeOrder.waiterName || "Staff"}
+                </Text>
+              </View>
+              <Text
+                style={{
+                  color: statusColor,
+                  fontSize: 15,
+                  fontWeight: "800",
+                }}
+              >
+                {activeOrder.totalAmount?.toLocaleString()}{" "}
+                {Translations.uz.common.currency}
+              </Text>
+            </View>
           </View>
         )}
       </TouchableOpacity>
@@ -543,7 +558,7 @@ export default function WaiterStationScreen() {
           router.push({
             pathname: "/create-order",
             params: {
-              tableId: order.tableId,
+              tableId: typeof order.tableId === 'object' ? order.tableId._id : order.tableId,
               tableName: order.tableName,
               orderId: order._id,
             },
@@ -637,9 +652,12 @@ export default function WaiterStationScreen() {
             </Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleHeaderAction}
+        >
           <MaterialCommunityIcons
-            name="logout"
+            name={user?.role === "owner" ? "arrow-left" : "logout"}
             size={24}
             color={colors.secondary}
           />

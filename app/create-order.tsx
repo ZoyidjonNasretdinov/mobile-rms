@@ -106,6 +106,7 @@ export default function CreateOrderScreen() {
                 categoryId: menuItem?.categoryId,
                 status: item.status,
                 department: item.department,
+                completedBy: item.completedBy,
               };
               if (item.status && item.status !== "Pending") {
                 // For non-pending items, the original quantity is specific to that entry
@@ -231,7 +232,7 @@ export default function CreateOrderScreen() {
 
       const orderData = {
         tableId,
-        tableName: tableName.toString(),
+        tableName: tableName ? tableName.toString() : "",
         items: cartItems.map((item) => ({
           _id: item._id && !item._id.startsWith("old-") ? item._id : undefined,
           name: item.name,
@@ -369,6 +370,11 @@ export default function CreateOrderScreen() {
                       </Text>
                     </View>
                   </View>
+                  {item.status === "Ready" && item.completedBy && (
+                    <Text style={{ fontSize: 10, color: colors.secondary, marginTop: 2 }} numberOfLines={1}>
+                      👨‍🍳 {item.completedBy}
+                    </Text>
+                  )}
                 </View>
               );
             })}

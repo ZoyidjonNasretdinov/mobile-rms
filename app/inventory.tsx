@@ -53,8 +53,37 @@ export default function InventoryStatusScreen() {
   // Category Management Modal
   const [catModal, setCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
+  // Dept Details Modal State
+  const [deptDetailsModal, setDeptDetailsModal] = useState(false);
+  const [selectedDeptStats, setSelectedDeptStats] = useState<any>(null);
 
   const departments = ["oshpaz", "salatchi", "shashlikchi", "bar", "ofisiant"];
+
+  const formatTotalByUnit = (itemsArray: any[]) => {
+    const totals: Record<string, number> = {};
+    itemsArray.forEach(item => {
+      const u = item.unit || 'ta';
+      const q = item.currentStock || 0;
+      if (!totals[u]) totals[u] = 0;
+      totals[u] += q;
+    });
+    const entries = Object.entries(totals);
+    if (entries.length === 0) return "0";
+    return entries.map(([u, q]) => `${q.toLocaleString(undefined, { maximumFractionDigits: 1 })}${u}`).join(', ');
+  };
+
+  const getDeptTotalByUnit = (deptStock: any[]) => {
+    const totals: Record<string, number> = {};
+    deptStock.forEach(st => {
+      const u = st.productId?.unit || 'ta';
+      const q = st.quantity || 0;
+      if (!totals[u]) totals[u] = 0;
+      totals[u] += q;
+    });
+    const entries = Object.entries(totals);
+    if (entries.length === 0) return "0";
+    return entries.map(([u, q]) => `${q.toLocaleString(undefined, { maximumFractionDigits: 1 })}${u}`).join(', ');
+  };
 
   const fetchData = async () => {
     try {
@@ -92,15 +121,14 @@ export default function InventoryStatusScreen() {
 
   useEffect(() => {
     const socket = socketService.getSocket();
-    socket.on("stockUpdated", () => {
-      fetchData();
-    });
-    socket.on("staffStockUpdated", () => {
-      fetchData();
-    });
+    const handleUpdate = () => fetchData();
+    
+    socket.on("stockUpdated", handleUpdate);
+    socket.on("staffStockUpdated", handleUpdate);
+    
     return () => {
-      socket.off("stockUpdated");
-      socket.off("staffStockUpdated");
+      socket.off("stockUpdated", handleUpdate);
+      socket.off("staffStockUpdated", handleUpdate);
     };
   }, []);
 
@@ -486,6 +514,50 @@ export default function InventoryStatusScreen() {
           >
             <View style={styles.statsSection}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {"Umumiy Ombor Qoldig'i"}
+              </Text>
+              <View style={[styles.totalStockCard, { backgroundColor: colors.card }]}>
+                <View style={styles.totalStockGrid}>
+                  <View style={[styles.totalStockItem, { borderRightWidth: 1, borderBottomWidth: 1, borderColor: colors.border }]}>
+                    <MaterialCommunityIcons name="package-variant-closed" size={22} color={colors.primary} />
+                    <Text style={[styles.totalStockValue, { color: colors.text }]}>
+                      {items.length}
+                    </Text>
+                    <Text style={[styles.totalStockLabel, { color: colors.secondary }]}>
+                      Mahsulot turi
+                    </Text>
+                  </View>
+                  <View style={[styles.totalStockItem, { borderBottomWidth: 1, borderColor: colors.border }]}>
+                    <MaterialCommunityIcons name="scale" size={22} color={"#10B981"} />
+                    <Text style={[styles.totalStockValue, { color: colors.text, fontSize: 13 }]} numberOfLines={2} adjustsFontSizeToFit>
+                      {formatTotalByUnit(items)}
+                    </Text>
+                    <Text style={[styles.totalStockLabel, { color: colors.secondary }]}>
+                      Jami qoldiq
+                    </Text>
+                  </View>
+                  <View style={[styles.totalStockItem, { borderRightWidth: 1, borderColor: colors.border }]}>
+                    <MaterialCommunityIcons name="alert-outline" size={22} color={"#F59E0B"} />
+                    <Text style={[styles.totalStockValue, { color: "#F59E0B" }]}>
+                      {items.filter((i: any) => i.currentStock > 0 && i.currentStock <= (i.minThreshold || 0)).length}
+                    </Text>
+                    <Text style={[styles.totalStockLabel, { color: colors.secondary }]}>
+                      Kam qolgan
+                    </Text>
+                  </View>
+                  <View style={[styles.totalStockItem, { borderColor: colors.border }]}>
+                    <MaterialCommunityIcons name="close-circle-outline" size={22} color={colors.danger} />
+                    <Text style={[styles.totalStockValue, { color: colors.danger }]}>
+                      {items.filter((i: any) => i.currentStock <= 0).length}
+                    </Text>
+                    <Text style={[styles.totalStockLabel, { color: colors.secondary }]}>
+                      Tugagan
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 16 }]}>
                 {"Bo'limlardagi qoldiqlar"}
               </Text>
               <ScrollView
@@ -503,8 +575,13 @@ export default function InventoryStatusScreen() {
                   ).length;
 
                   return (
-                    <View
+                    <TouchableOpacity
                       key={s._id}
+                      onPress={() => {
+                        setSelectedDeptStats(s);
+                        setDeptDetailsModal(true);
+                      }}
+                      activeOpacity={0.8}
                       style={[
                         styles.statCard,
                         {
@@ -590,7 +667,7 @@ export default function InventoryStatusScreen() {
                           </View>
                         ))}
                         {deptStock.length > 5 && (
-                          <TouchableOpacity style={{ marginTop: 8 }}>
+                          <View style={{ marginTop: 8 }}>
                             <Text
                               style={{
                                 color: colors.primary,
@@ -600,7 +677,7 @@ export default function InventoryStatusScreen() {
                             >
                               Yana {deptStock.length - 5} ta mahsulot...
                             </Text>
-                          </TouchableOpacity>
+                          </View>
                         )}
                         {deptStock.length === 0 && (
                           <View style={styles.emptyMiniStock}>
@@ -624,7 +701,7 @@ export default function InventoryStatusScreen() {
 
                       <View style={styles.statDivider} />
                       <View style={styles.statFooter}>
-                        <View>
+                        <View style={{ flex: 1 }}>
                           <Text
                             style={{ fontSize: 10, color: colors.secondary }}
                           >
@@ -636,11 +713,13 @@ export default function InventoryStatusScreen() {
                               {
                                 color: colors.text,
                                 fontWeight: "bold",
-                                fontSize: 15,
+                                fontSize: 12,
+                                marginTop: 2,
                               },
                             ]}
+                            numberOfLines={2}
                           >
-                            {s.totalQuantity.toLocaleString()}
+                            {getDeptTotalByUnit(deptStock)}
                           </Text>
                         </View>
                         <MaterialCommunityIcons
@@ -649,7 +728,7 @@ export default function InventoryStatusScreen() {
                           color={colors.border}
                         />
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </ScrollView>
@@ -830,6 +909,59 @@ export default function InventoryStatusScreen() {
                   </Text>
                 )}
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Department Details Modal */}
+      <Modal visible={deptDetailsModal} transparent animationType="slide" statusBarTranslucent>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            activeOpacity={1} 
+            onPress={() => setDeptDetailsModal(false)} 
+            style={{ ...StyleSheet.absoluteFillObject }}
+          />
+          <View style={[styles.bottomSheet, { backgroundColor: colors.background, flex: 0.92, borderTopLeftRadius: 30, borderTopRightRadius: 30, marginTop: '15%' }]}>
+            <View style={styles.sheetHandleContainer}>
+              <View style={styles.sheetHandle} />
+            </View>
+            <View style={[styles.modalContent, { flex: 1, paddingBottom: 20 }]}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity
+                  onPress={() => setDeptDetailsModal(false)}
+                  style={styles.modalCloseBtn}
+                >
+                  <MaterialCommunityIcons
+                    name="arrow-left"
+                    size={26}
+                    color={colors.text}
+                  />
+                </TouchableOpacity>
+                <Text style={[styles.modalTitle, { color: colors.text, textTransform: 'uppercase' }]}>
+                  {selectedDeptStats?._id || ""} QOLDIG'I
+                </Text>
+                <View style={{ width: 40 }} />
+              </View>
+
+              <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+                {allStaffStock.filter(st => st.userId === selectedDeptStats?._id).length === 0 ? (
+                  <Text style={[styles.emptyText, { color: colors.secondary, textAlign: 'center', marginTop: 20 }]}>Bu bo'limda mahsulot yo'q</Text>
+                ) : (
+                  allStaffStock.filter(st => st.userId === selectedDeptStats?._id).map((st, idx) => (
+                    <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}>
+                          {st.productId?.name || "Noma'lum"}
+                        </Text>
+                      </View>
+                      <Text style={{ color: getStockColor(st.quantity), fontSize: 16, fontWeight: '700' }}>
+                        {Number(st.quantity).toLocaleString(undefined, { maximumFractionDigits: 3 })} {st.productId?.unit || ""}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
             </View>
           </View>
         </View>
@@ -1055,6 +1187,37 @@ const styles = StyleSheet.create({
   bottomSpace: { height: 100 },
   statsSection: { marginBottom: 20 },
   sectionTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10 },
+  // Total Stock Summary Card
+  totalStockCard: {
+    borderRadius: 20,
+    overflow: "hidden",
+    marginBottom: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  totalStockGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  totalStockItem: {
+    width: "50%",
+    padding: 16,
+    alignItems: "center",
+    gap: 6,
+  },
+  totalStockValue: {
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+  },
+  totalStockLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    textAlign: "center",
+  },
   statsScroll: { gap: 10 },
   statCard: {
     width: 240,
@@ -1244,4 +1407,38 @@ const styles = StyleSheet.create({
   logTime: { fontSize: 11, marginTop: 2 },
   logQty: { fontSize: 14, fontWeight: "bold" },
   logReason: { fontSize: 13 },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  bottomSheet: {
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    overflow: "hidden",
+  },
+  sheetHandleContainer: {
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(0,0,0,0.15)",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 8,
+    paddingBottom: 12,
+  },
+  modalCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });

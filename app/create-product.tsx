@@ -193,19 +193,19 @@ export default function CreateProductScreen() {
             <View
               style={[
                 styles.inputWrapper,
-                { backgroundColor: colors.card, borderColor: colors.border },
+                { backgroundColor: colors.input, borderColor: colors.border },
               ]}
             >
               <MaterialCommunityIcons
-                name="tag-outline"
-                size={20}
-                color={colors.secondary}
-                style={{ marginRight: 10 }}
+                name="cube-outline"
+                size={22}
+                color={colors.primary}
+                style={{ marginRight: 12 }}
               />
               <TextInput
                 style={[styles.input, { color: colors.text }]}
-                placeholder="Masalan: Guruch, Mol go'shti..."
-                placeholderTextColor={colors.secondary}
+                placeholder="Masalan: Guruch, Go'sht..."
+                placeholderTextColor={colors.secondary + "90"}
                 value={form.name}
                 onChangeText={(val) => setForm({ ...form, name: val })}
               />
@@ -233,8 +233,9 @@ export default function CreateProductScreen() {
                         backgroundColor:
                           form.category === cat.name
                             ? colors.primary
-                            : colors.card,
-                        borderColor: "transparent",
+                            : colors.input,
+                        borderWidth: 1,
+                        borderColor: form.category === cat.name ? colors.primary : colors.border,
                       },
                     ]}
                   >
@@ -271,8 +272,9 @@ export default function CreateProductScreen() {
                     styles.chip,
                     {
                       backgroundColor:
-                        form.unit === u ? colors.primary : colors.card,
-                      borderColor: "transparent",
+                        form.unit === u ? colors.primary : colors.input,
+                      borderWidth: 1,
+                      borderColor: form.unit === u ? colors.primary : colors.border,
                     },
                   ]}
                 >
@@ -291,28 +293,29 @@ export default function CreateProductScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.secondary }]}>
-              Minimum qoldiq (Ogohlantirish uchun)
+              Minimum qoldiq (Ogohlantirish)
             </Text>
             <View
               style={[
                 styles.inputWrapper,
-                { backgroundColor: colors.card, borderColor: colors.border },
+                { backgroundColor: colors.input, borderColor: colors.border },
               ]}
             >
               <MaterialCommunityIcons
-                name="alert-outline"
-                size={20}
-                color={colors.secondary}
-                style={{ marginRight: 10 }}
+                name="bell-ring-outline"
+                size={22}
+                color={colors.warning}
+                style={{ marginRight: 12 }}
               />
               <TextInput
                 style={[styles.input, { color: colors.text }]}
-                placeholder="Masalan: 5, 10..."
-                placeholderTextColor={colors.secondary}
+                placeholder="0"
+                placeholderTextColor={colors.secondary + "90"}
                 keyboardType="numeric"
                 value={form.minThreshold}
                 onChangeText={(val) => setForm({ ...form, minThreshold: val })}
               />
+              <Text style={{ color: colors.secondary, fontWeight: "800", fontSize: 13 }}>{form.unit.toUpperCase()}</Text>
             </View>
           </View>
 
@@ -324,12 +327,19 @@ export default function CreateProductScreen() {
               <View
                 style={[
                   styles.inputWrapper,
-                  { backgroundColor: colors.card, borderColor: colors.border },
+                  { backgroundColor: colors.input, borderColor: colors.border },
                 ]}
               >
+                <MaterialCommunityIcons
+                  name="database-outline"
+                  size={18}
+                  color={colors.primary}
+                  style={{ marginRight: 8 }}
+                />
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
                   placeholder="0"
+                  placeholderTextColor={colors.secondary + "90"}
                   keyboardType="numeric"
                   value={form.currentStock}
                   onChangeText={(val) =>
@@ -340,17 +350,24 @@ export default function CreateProductScreen() {
             </View>
             <View style={[styles.inputGroup, { flex: 1 }]}>
               <Text style={[styles.label, { color: colors.secondary }]}>
-                Narxi (bir dona uchun)
+                Narxi (1 {form.unit})
               </Text>
               <View
                 style={[
                   styles.inputWrapper,
-                  { backgroundColor: colors.card, borderColor: colors.border },
+                  { backgroundColor: colors.input, borderColor: colors.border },
                 ]}
               >
+                <MaterialCommunityIcons
+                  name="cash"
+                  size={18}
+                  color={colors.success}
+                  style={{ marginRight: 8 }}
+                />
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
                   placeholder="0"
+                  placeholderTextColor={colors.secondary + "90"}
                   keyboardType="numeric"
                   value={form.costPerUnit}
                   onChangeText={(val) => setForm({ ...form, costPerUnit: val })}
@@ -361,7 +378,7 @@ export default function CreateProductScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.secondary }]}>
-              Ikona tanlash
+              Mahsulot belgisi (Icon)
             </Text>
             <ScrollView
               horizontal
@@ -369,24 +386,10 @@ export default function CreateProductScreen() {
               contentContainerStyle={styles.iconGrid}
             >
               {[
-                "package-variant-closed",
-                "food-steak",
-                "carrot",
-                "leaf",
-                "grain",
-                "baguette",
-                "oil",
-                "cheese",
-                "tea",
-                "fruit-citrus",
-                "egg",
-                "tomato",
-                "chili-hot",
-                "potato",
-                "cucumber",
-                "bottle-wine",
-                "fire",
-                "flask-outline",
+                "package-variant-closed", "food-steak", "carrot", "leaf",
+                "grain", "baguette", "oil", "cheese", "tea", "fruit-citrus",
+                "egg", "tomato", "chili-hot", "potato", "cucumber",
+                "bottle-wine", "fire", "flask-outline",
               ].map((ic) => (
                 <TouchableOpacity
                   key={ic}
@@ -398,7 +401,9 @@ export default function CreateProductScreen() {
                     styles.iconBtn,
                     {
                       backgroundColor:
-                        form.icon === ic ? colors.primary : colors.card,
+                        form.icon === ic ? colors.primary : colors.input,
+                      borderWidth: 1,
+                      borderColor: form.icon === ic ? colors.primary : colors.border,
                     },
                   ]}
                 >
@@ -427,7 +432,7 @@ export default function CreateProductScreen() {
             {loading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.submitBtnText}>Saqlash</Text>
+              <Text style={styles.submitBtnText}>Mahsulotni saqlash</Text>
             )}
           </TouchableOpacity>
 
@@ -437,8 +442,9 @@ export default function CreateProductScreen() {
               onPress={handleDelete}
               disabled={loading}
             >
-              <Text style={[styles.deleteBtnText, { color: colors.danger }]}>
-                Mahsulotni o'chirish
+              <MaterialCommunityIcons name="trash-can-outline" size={20} color={colors.danger} />
+              <Text style={[styles.deleteBtnText, { color: colors.danger, marginLeft: 8 }]}>
+                O'chirish
               </Text>
             </TouchableOpacity>
           )}
@@ -460,83 +466,85 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  headerTitle: { fontSize: 22, fontWeight: "900" },
+  scroll: { paddingHorizontal: 24, paddingTop: 10, paddingBottom: 40, gap: 24 },
+  inputGroup: { gap: 10 },
+  label: {
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    opacity: 0.6,
+  },
+  inputWrapper: {
+    height: 62,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  input: { flex: 1, fontSize: 16, fontWeight: "700" },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  chip: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 5,
     elevation: 2,
   },
-  headerTitle: { fontSize: 20, fontWeight: "800" },
-  scroll: { paddingHorizontal: 24, paddingTop: 10, paddingBottom: 40, gap: 28 },
-  inputGroup: { gap: 12 },
-  label: {
-    fontSize: 13,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  inputWrapper: {
-    height: 58,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  input: { flex: 1, fontSize: 16, fontWeight: "500" },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 1,
-  },
-  chipText: { fontSize: 14, fontWeight: "700" },
+  chipText: { fontSize: 14, fontWeight: "800" },
   footer: {
     padding: 24,
     borderTopWidth: 1,
-    borderTopColor: "rgba(0,0,0,0.03)",
+    borderTopColor: "rgba(0,0,0,0.05)",
   },
   submitBtn: {
-    height: 60,
-    borderRadius: 20,
+    height: 64,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  submitBtnText: { color: "white", fontSize: 16, fontWeight: "bold" },
-  rowInputs: { flexDirection: "row", gap: 16 },
+  submitBtnText: { color: "white", fontSize: 18, fontWeight: "bold" },
+  rowInputs: { flexDirection: "row", gap: 12 },
   iconGrid: { paddingVertical: 5, gap: 12 },
   iconBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
+    width: 54,
+    height: 54,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 5,
-    elevation: 1,
+    elevation: 2,
   },
   deleteBtn: {
     height: 50,
+    flexDirection: 'row',
     justifyContent: "center",
     alignItems: "center",
   },
   deleteBtnText: {
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 });

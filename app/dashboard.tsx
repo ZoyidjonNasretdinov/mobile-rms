@@ -37,7 +37,7 @@ export default function DashboardScreen() {
     active: 0,
     total: 0,
   });
-  const [role, setRole] = useState("");
+  const [user, setUser] = useState<any>(null);
   const [revenue, setRevenue] = useState(0);
   const [orderCount, setOrderCount] = useState(0);
   const [stockStats, setStockStats] = useState({ low: 0, total: 0 });
@@ -48,75 +48,70 @@ export default function DashboardScreen() {
     "start",
   );
   const [shiftCash, setShiftCash] = useState("0");
+  const [shiftCard, setShiftCard] = useState("0");
   const [processingShift, setProcessingShift] = useState(false);
   const [eodReport, setEodReport] = useState<any>(null);
   const [showEodModal, setShowEodModal] = useState(false);
+  const [expectedTotals, setExpectedTotals] = useState({ cash: 0, card: 0 });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       const userStr = await Storage.getItem("user");
       if (userStr) {
-        const user = JSON.parse(userStr);
-        setRole(user.role);
-
-        const userRole = user.role?.toLowerCase();
-        if (userRole === "ofisiant") router.replace("/waiter");
-        if (["oshpaz", "shashlikchi", "salatchi", "bar"].includes(userRole))
-          router.replace("/kitchen");
-        if (userRole === "kassier") router.replace("/cashier");
+        const userData = JSON.parse(userStr);
+        setUser(userData);
       }
 
       try {
         const token = await Storage.getItem("access_token");
         const headers = { Authorization: `Bearer ${token}` };
+        
+        let isOwner = false;
+        if (userStr) {
+          const userData = JSON.parse(userStr);
+          isOwner = userData.role === "owner";
+        }
 
-        const usersRes = await axios.get(`${CONFIG.API_BASE_URL}/users`, {
-          headers,
-        });
-        const staff = usersRes.data;
-        const active = staff.filter((s: any) => s.isActive).length;
-        setActiveStaffCount({ active, total: staff.length });
+        if (isOwner) {
+          const usersRes = await axios.get(`${CONFIG.API_BASE_URL}/users`, {
+            headers,
+          });
+          const staff = usersRes.data;
+          const active = staff.filter((s: any) => s.isActive).length;
+          setActiveStaffCount({ active, total: staff.length });
 
-        const now = new Date();
-        const startOfDay = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate(),
-        ).toISOString();
-        const endOfDay = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate(),
-          23,
-          59,
-          59,
-        ).toISOString();
+          const statsRes = await axios.get(
+            `${CONFIG.API_BASE_URL}/orders/stats`,
+            { headers }
+          );
+          setRevenue(statsRes.data.totalRevenue);
+          setOrderCount(statsRes.data.totalOrderCount);
 
-        const statsRes = await axios.get(
-          `${CONFIG.API_BASE_URL}/orders/stats`,
-          { headers },
-        );
-        setRevenue(statsRes.data.totalRevenue);
-        setOrderCount(statsRes.data.totalOrderCount);
+          const productsRes = await axios.get(
+            `${CONFIG.API_BASE_URL}/inventory/products`,
+            { headers }
+          );
+          const products = productsRes.data;
+          const lowStock = products.filter(
+            (p: any) => p.currentStock <= (p.minThreshold || 0)
+          ).length;
+          setStockStats({ low: lowStock, total: products.length });
+        }
 
-        const productsRes = await axios.get(
-          `${CONFIG.API_BASE_URL}/inventory/products`,
-          { headers },
-        );
-        const products = productsRes.data;
-        const lowStock = products.filter(
-          (p: any) => p.currentStock <= (p.minThreshold || 0),
-        ).length;
-        setStockStats({ low: lowStock, total: products.length });
-
+        // Barcha uchun smena haqida ma'lumot
         const shiftRes = await axios.get(
           `${CONFIG.API_BASE_URL}/shifts/active`,
           { headers },
         );
         setActiveShift(shiftRes.data);
         setIsShiftActive(!!shiftRes.data);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Dashboard fetch error:", error);
+        if (error.response?.status === 401) {
+          await Storage.removeItem("access_token");
+          await Storage.removeItem("user");
+          router.replace("/login");
+        }
       }
     };
 
@@ -151,12 +146,146 @@ export default function DashboardScreen() {
   const handleStartShift = () => {
     setShiftModalType("start");
     setShiftCash("0");
+    setShiftCard("0");
     setShowShiftModal(true);
   };
 
-  const handleEndShift = () => {
+  const getActions = () => {
+    const hasRole = (r: string) => {
+      if (!user) return false;
+      const target = r.toLowerCase();
+      const primary = user.role?.toLowerCase() || "";
+      const extras = (user.extraRoles || []).map((e: string) => e.toLowerCase());
+      return primary === target || extras.includes(target);
+    };
+    const isOwner = user?.role === "owner";
+
+    const actions: any[] = [];
+
+    // Owner-only Admin Actions
+    if (isOwner) {
+      actions.push(
+        {
+          title: t.staff,
+          icon: "account-group",
+          color: "#3B82F6",
+          onPress: () => router.push("/staff"),
+        },
+        {
+          title: t.tables,
+          icon: "table-furniture",
+          color: "#00AEEF",
+          onPress: () => router.push("/tables-admin"),
+        },
+        {
+          title: t.inventory,
+          icon: "package-variant-closed",
+          color: "#8B5CF6",
+          onPress: () => router.push("/inventory"),
+        },
+        {
+          title: Translations.uz.procurement.title,
+          icon: "cart-outline",
+          color: "#F59E0B",
+          onPress: () => router.push("/procurement"),
+        },
+        {
+          title: Translations.uz.menu.title,
+          icon: "silverware-fork-knife",
+          color: "#EC4899",
+          onPress: () => router.push("/menu"),
+        },
+        {
+          title: Translations.uz.products.title,
+          icon: "cube-outline",
+          color: "#EC4899",
+          onPress: () => router.push("/products"),
+        },
+        {
+          title: Translations.uz.eodReport.title,
+          icon: "chart-box-outline",
+          color: "#6366F1",
+          onPress: () => router.push("/reports"),
+        },
+      );
+    }
+
+    // Role-Specific Operation Actions
+    if (isOwner || hasRole("oshpaz")) {
+      actions.push({
+        title: Translations.uz.kitchen.title,
+        icon: "stove",
+        color: "#FF9F1C",
+        onPress: () => router.push("/kitchen?dept=oshpaz"),
+      });
+    }
+    if (isOwner || hasRole("shashlikchi")) {
+      actions.push({
+        title: Translations.uz.kitchen.grillTitle,
+        icon: "fire",
+        color: "#EF4444",
+        onPress: () => router.push("/kitchen?dept=shashlikchi"),
+      });
+    }
+    if (isOwner || hasRole("bar")) {
+      actions.push({
+        title: Translations.uz.kitchen.barTitle,
+        icon: "glass-cocktail",
+        color: "#3B82F6",
+        onPress: () => router.push("/kitchen?dept=bar"),
+      });
+    }
+    if (isOwner || hasRole("salatchi")) {
+      actions.push({
+        title: Translations.uz.kitchen.saladTitle,
+        icon: "leaf",
+        color: "#10B981",
+        onPress: () => router.push("/kitchen?dept=salatchi"),
+      });
+    }
+    if (isOwner || hasRole("ofisiant")) {
+      actions.push({
+        title: Translations.uz.waiter.title,
+        icon: "room-service",
+        color: "#2EC4B6",
+        onPress: () => router.push("/waiter"),
+      });
+    }
+    if (isOwner || hasRole("kassier")) {
+      actions.push({
+        title: Translations.uz.cashier.title,
+        icon: "cash-register",
+        color: "#10B981",
+        onPress: () => router.push("/cashier"),
+      });
+    }
+
+    return actions.filter(Boolean);
+  };
+
+  const handleEndShift = async () => {
+    if (!activeShift) return;
     setShiftModalType("end");
     setShiftCash("0");
+    setShiftCard("0");
+
+    // Fetch expected totals before showing modal
+    try {
+      const token = await Storage.getItem("access_token");
+      const res = await axios.get(
+        `${CONFIG.API_BASE_URL}/reports/shift-summary/${activeShift._id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      setExpectedTotals({
+        cash: res.data.stats.expectedCash,
+        card: res.data.stats.expectedCard,
+      });
+    } catch (e) {
+      console.error("Error fetching expected totals", e);
+    }
+
     setShowShiftModal(true);
   };
 
@@ -179,11 +308,22 @@ export default function DashboardScreen() {
         shiftModalType === "start" ? "/shifts/start" : "/shifts/end";
 
       const cashValue = parseFloat(shiftCash.replace(/[^0-9.]/g, "") || "0");
+      const cardValue = parseFloat(shiftCard.replace(/[^0-9.]/g, "") || "0");
 
       const body =
         shiftModalType === "start"
-          ? { openedBy: userId, startCash: cashValue }
-          : { closedBy: userId, endCash: cashValue };
+          ? {
+              openedBy: userId,
+              startCash: cashValue,
+              startCard: cardValue,
+            }
+          : {
+              closedBy: userId,
+              endCash: cashValue,
+              endCard: cardValue,
+              expectedCash: expectedTotals.cash,
+              expectedCard: expectedTotals.card,
+            };
 
       const shiftRes = await axios.post(
         `${CONFIG.API_BASE_URL}${endpoint}`,
@@ -253,23 +393,6 @@ export default function DashboardScreen() {
         <View style={[styles.iconContainer, { backgroundColor: bgColor }]}>
           <MaterialCommunityIcons name={icon} size={24} color={iconColor} />
         </View>
-        <View style={styles.changeContainer}>
-          <MaterialCommunityIcons
-            name={change.startsWith("+") ? "trending-up" : "trending-down"}
-            size={16}
-            color={change.startsWith("+") ? colors.success : colors.danger}
-          />
-          <Text
-            style={[
-              styles.changeText,
-              {
-                color: change.startsWith("+") ? colors.success : colors.danger,
-              },
-            ]}
-          >
-            {change}
-          </Text>
-        </View>
       </View>
       <Text
         style={[styles.perfValue, { color: colors.text }]}
@@ -316,8 +439,27 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {t.title}
+            {user?.role === "owner" ? t.title : "Bosh sahifa"}
           </Text>
+          {user?.role === "owner" && (
+            <View style={styles.shiftStatusRow}>
+              <View
+                style={[
+                  styles.statusDot,
+                  {
+                    backgroundColor: isShiftActive
+                      ? colors.success
+                      : colors.danger,
+                  },
+                ]}
+              />
+              <Text
+                style={[styles.headerSubtitle, { color: colors.secondary }]}
+              >
+                {t.shiftStatus}: {isShiftActive ? t.active : t.closed}
+              </Text>
+            </View>
+          )}
         </View>
         <TouchableOpacity
           style={styles.profileButton}
@@ -335,163 +477,152 @@ export default function DashboardScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          {t.performance}
-        </Text>
-
-        <View style={styles.shiftActions}>
-          <TouchableOpacity
-            style={[
-              styles.shiftBtn,
-              {
-                backgroundColor: isShiftActive ? colors.danger : colors.success,
-              },
-            ]}
-            onPress={isShiftActive ? handleEndShift : handleStartShift}
-          >
-            <MaterialCommunityIcons
-              name={isShiftActive ? "clock-end" : "clock-start"}
-              size={24}
-              color="white"
-            />
-            <Text style={styles.shiftBtnText}>
-              {isShiftActive ? t.endDay : t.startDay}
-            </Text>
-          </TouchableOpacity>
-          <View style={styles.shiftStatusRow}>
-            <View
+        {/* Shift Actions */}
+        {user?.role === "owner" && (
+          <View style={styles.shiftActions}>
+            <TouchableOpacity
               style={[
-                styles.statusDot,
+                styles.shiftBtn,
                 {
                   backgroundColor: isShiftActive
-                    ? colors.success
-                    : colors.danger,
+                    ? colors.danger
+                    : colors.success,
                 },
               ]}
-            />
-            <Text
-              style={{
-                color: colors.secondary,
-                fontSize: 13,
-                fontWeight: "600",
-              }}
+              onPress={isShiftActive ? handleEndShift : handleStartShift}
             >
-              {t.shiftStatus}: {isShiftActive ? t.active : t.closed}
-            </Text>
+              <MaterialCommunityIcons
+                name={isShiftActive ? "clock-end" : "clock-start"}
+                size={24}
+                color="white"
+              />
+              <Text style={styles.shiftBtnText}>
+                {isShiftActive ? t.endDay : t.startDay}
+              </Text>
+            </TouchableOpacity>
           </View>
-        </View>
-        <View style={styles.perfGrid}>
-          <PerformanceCard
-            title={t.revenue}
-            value={`${revenue.toLocaleString()} ${Translations.uz.common.currency}`}
-            change="+12%"
-            icon="bank-transfer"
-            iconColor="#10B981"
-            bgColor="#10B98115"
-          />
-          <PerformanceCard
-            title={t.orders}
-            value={orderCount.toString()}
-            change="+8%"
-            icon="clipboard-list"
-            iconColor="#3B82F6"
-            bgColor="#3B82F615"
-            onPress={() => router.push("/orders")}
-          />
-          <PerformanceCard
-            title={t.staffOnDuty}
-            value={`${activeStaffCount.active}/${activeStaffCount.total}`}
-            change={t.now}
-            icon="account-group-outline"
-            iconColor="#8B5CF6"
-            bgColor="#8B5CF615"
-            onPress={() => router.push("/staff")}
-          />
-          <PerformanceCard
-            title={t.stockLevel}
-            value={stockStats.total.toString()}
-            change={stockStats.low > 0 ? `${stockStats.low} kam` : "Normal"}
-            icon="cube-outline"
-            iconColor={stockStats.low > 0 ? "#EF4444" : "#F59E0B"}
-            bgColor={stockStats.low > 0 ? "#EF444415" : "#F59E0B15"}
-            onPress={() => router.push("/inventory")}
-          />
-        </View>
+        )}
+
+        {/* Owner Performance Grid */}
+        {user?.role === "owner" && (
+          <View style={styles.perfGrid}>
+            <PerformanceCard
+              title={t.revenue}
+              value={`${revenue.toLocaleString()} ${
+                Translations.uz.common.currency
+              }`}
+              change="+12.5%"
+              icon="cash-multiple"
+              iconColor="#10B981"
+              bgColor="#10B98115"
+            />
+            <PerformanceCard
+              title={t.orders}
+              value={orderCount.toString()}
+              change="+5"
+              icon="receipt"
+              iconColor="#3B82F6"
+              bgColor="#3B82F615"
+            />
+            <PerformanceCard
+              title={t.staffOnDuty}
+              value={`${activeStaffCount.active}/${activeStaffCount.total}`}
+              change="Faol"
+              icon="account-group"
+              iconColor="#8B5CF6"
+              bgColor="#8B5CF615"
+            />
+            <PerformanceCard
+              title={t.stockLevel}
+              value={`${stockStats.low} kam`}
+              change={`${stockStats.total} jami`}
+              icon="package-variant-closed"
+              iconColor="#F59E0B"
+              bgColor="#F59E0B15"
+            />
+          </View>
+        )}
+
+        {user?.role !== "owner" && (
+          <>
+            <View style={styles.perfGrid}>
+              {[user?.role, ...(user?.extraRoles || [])]
+                .filter((r) =>
+                  ["oshpaz", "shashlikchi", "salatchi", "bar", "ofisiant"].includes(
+                    r?.toLowerCase(),
+                  ),
+                )
+                .map((role) => {
+                  const roleLower = role.toLowerCase();
+                  const configs: Record<
+                    string,
+                    { title: string; color: string; icon: any }
+                  > = {
+                    oshpaz: {
+                      title: "Oshpaz Ombori",
+                      color: "#FF9F1C",
+                      icon: "chef-hat",
+                    },
+                    shashlikchi: {
+                      title: "Shashlikchi Ombori",
+                      color: "#EF4444",
+                      icon: "fire",
+                    },
+                    salatchi: {
+                      title: "Salatchi Ombori",
+                      color: "#10B981",
+                      icon: "leaf",
+                    },
+                    bar: {
+                      title: "Bar Ombori",
+                      color: "#3B82F6",
+                      icon: "glass-cocktail",
+                    },
+                    ofisiant: {
+                      title: "Ofitsiant Ombori",
+                      color: "#2EC4B6",
+                      icon: "room-service",
+                    },
+                  };
+
+                  const config = configs[roleLower];
+                  if (!config) return null;
+
+                  return (
+                    <PerformanceCard
+                      key={roleLower}
+                      title={config.title}
+                      value="Ko'rib chiqish"
+                      change="Mavjud"
+                      icon={config.icon}
+                      iconColor={config.color}
+                      bgColor={config.color + "15"}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/staff-inventory",
+                          params: { dept: roleLower },
+                        })
+                      }
+                    />
+                  );
+                })}
+            </View>
+          </>
+        )}
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           {t.quickActions}
         </Text>
         <View style={styles.actionGrid}>
-          {[
-            {
-              title: t.staff,
-              icon: "account-group",
-              color: "#3B82F6",
-              onPress: () => router.push("/staff"),
-            },
-            {
-              title: t.tables,
-              icon: "table-furniture",
-              color: "#00AEEF",
-              onPress: () => router.push("/tables-admin"),
-            },
-            {
-              title: t.inventory,
-              icon: "package-variant-closed",
-              color: "#8B5CF6",
-              onPress: () => router.push("/inventory"),
-            },
-            {
-              title: Translations.uz.procurement.title,
-              icon: "cart-outline",
-              color: "#F59E0B",
-              onPress: () => router.push("/procurement"),
-            },
-            {
-              title: Translations.uz.partners.title,
-              icon: "handshake-outline",
-              color: "#10B981",
-              onPress: () => router.push("/partners"),
-            },
-            {
-              title: Translations.uz.menu.title,
-              icon: "silverware-fork-knife",
-              color: "#EC4899",
-              onPress: () => router.push("/menu"),
-            },
-            {
-              title: Translations.uz.products.title,
-              icon: "cube-outline",
-              color: "#EC4899",
-              onPress: () => router.push("/products"),
-            },
-            role === "owner"
-              ? {
-                  title: Translations.uz.eodReport.title,
-                  icon: "chart-box-outline",
-                  color: "#6366F1",
-                  onPress: () => router.push("/reports"),
-                }
-              : null,
-            role === "owner" || role === "kassier"
-              ? {
-                  title: Translations.uz.cashier.title,
-                  icon: "cash-register",
-                  color: "#10B981",
-                  onPress: () => router.push("/cashier"),
-                }
-              : null,
-          ]
-            .filter(Boolean)
-            .map((action: any, idx) => (
-              <QuickAction
-                key={idx}
-                title={action.title}
-                icon={action.icon}
-                color={action.color}
-                onPress={action.onPress}
-              />
-            ))}
+          {getActions().map((action: any, idx) => (
+            <QuickAction
+              key={idx}
+              title={action.title}
+              icon={action.icon}
+              color={action.color}
+              onPress={action.onPress}
+            />
+          ))}
         </View>
 
         <View style={styles.bottomSpace} />
@@ -549,14 +680,115 @@ export default function DashboardScreen() {
                   keyboardType="numeric"
                   placeholder="0"
                   placeholderTextColor={colors.secondary}
-                  autoFocus
                 />
                 <Text
                   style={[styles.currencyLabel, { color: colors.secondary }]}
                 >
-                  {Translations.uz.common.currency}
+                  UZS
                 </Text>
               </View>
+
+              {shiftModalType === "end" && (
+                <View style={styles.discrepancyBox}>
+                  <Text
+                    style={[
+                      styles.discrepancyText,
+                      { color: colors.secondary },
+                    ]}
+                  >
+                    Kutilayotgan naqd: {expectedTotals.cash.toLocaleString()}{" "}
+                    UZS
+                  </Text>
+                  <Text
+                    style={[
+                      styles.discrepancyValue,
+                      {
+                        color:
+                          parseFloat(shiftCash) - expectedTotals.cash === 0
+                            ? colors.success
+                            : colors.danger,
+                      },
+                    ]}
+                  >
+                    Tafovut:{" "}
+                    {(
+                      parseFloat(shiftCash || "0") - expectedTotals.cash
+                    ).toLocaleString()}{" "}
+                    UZS
+                  </Text>
+                </View>
+              )}
+
+              <Text
+                style={[
+                  styles.modalLabel,
+                  { color: colors.secondary, marginTop: 16 },
+                ]}
+              >
+                {shiftModalType === "start"
+                  ? "Boshlang'ich karta balansi (terminal):"
+                  : "Yakuniy karta balansi (terminal):"}
+              </Text>
+
+              <View
+                style={[
+                  styles.cashInputContainer,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="credit-card-outline"
+                  size={24}
+                  color={colors.primary}
+                />
+                <TextInput
+                  style={[styles.cashInput, { color: colors.text }]}
+                  value={shiftCard}
+                  onChangeText={setShiftCard}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={colors.secondary}
+                />
+                <Text
+                  style={[styles.currencyLabel, { color: colors.secondary }]}
+                >
+                  UZS
+                </Text>
+              </View>
+
+              {shiftModalType === "end" && (
+                <View style={styles.discrepancyBox}>
+                  <Text
+                    style={[
+                      styles.discrepancyText,
+                      { color: colors.secondary },
+                    ]}
+                  >
+                    Kutilayotgan karta: {expectedTotals.card.toLocaleString()}{" "}
+                    UZS
+                  </Text>
+                  <Text
+                    style={[
+                      styles.discrepancyValue,
+                      {
+                        color:
+                          parseFloat(shiftCard) - expectedTotals.card === 0
+                            ? colors.success
+                            : colors.danger,
+                      },
+                    ]}
+                  >
+                    Tafovut:{" "}
+                    {(
+                      parseFloat(shiftCard || "0") - expectedTotals.card
+                    ).toLocaleString()}{" "}
+                    UZS
+                  </Text>
+                </View>
+              )}
 
               <TouchableOpacity
                 style={[
@@ -1055,6 +1287,20 @@ const styles = StyleSheet.create({
   currencyLabel: {
     fontSize: 16,
     fontWeight: "bold",
+  },
+  discrepancyBox: {
+    marginTop: 4,
+    paddingHorizontal: 4,
+    marginBottom: 4,
+  },
+  discrepancyText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  discrepancyValue: {
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2,
   },
   submitBtn: {
     height: 56,

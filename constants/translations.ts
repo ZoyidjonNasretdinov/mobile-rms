@@ -127,24 +127,6 @@ export const Translations = {
       sources: {
         cashier: "Kassa",
         owner: "Rahbar",
-        partner1: "Sherik 1",
-        partner2: "Sherik 2",
-      },
-    },
-    partners: {
-      title: "Sheriklar Hisoboti",
-      contribution: "Ulushlar",
-      profitShare: "Foyda ulushi",
-      fundingSource: "Moliyalashtirish manbasi",
-      totalInvested: "Jami investitsiya",
-      recentActivity: "Yaqindagi faollik",
-      names: {
-        partner1: "Sherik 1 (Akmal)",
-        partner2: "Sherik 2 (Jasur)",
-      },
-      stats: {
-        weekly: "Haftalik ulush",
-        monthly: "Oylik ulush",
       },
     },
     eodReport: {
@@ -215,6 +197,19 @@ export const Translations = {
         "Hisobingizni o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.",
       deleteSuccess: "Hisob o'chirildi",
       logoutSuccess: "Tizimdan chiqildi",
+    },
+    pin: {
+      title: "PIN-kod",
+      enter: "PIN-kodni kiriting",
+      setup: "Yangi PIN-kod o'rnating",
+      confirm: "PIN-kodni tasdiqlang",
+      mismatch: "PIN-kodlar mos kelmadi",
+      success: "PIN-kod muvaffaqiyatli o'rnatildi",
+      wrong: "PIN-kod noto'g'ri",
+      remove: "PIN-kodni o'chirish",
+      change: "PIN-kodni o'zgartirish",
+      forgot: "PIN-kodni unutdingizmi?",
+      resetHint: "PIN-kodni unutgan bo'lsangiz, tizimdan chiqib qayta kiring.",
     },
   },
 };

@@ -24,9 +24,16 @@ export default function ProfileScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const [hasPin, setHasPin] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const pinTrans = Translations.uz.pin;
+
 
   useEffect(() => {
+    const checkPin = async () => {
+      const pin = await Storage.getItem("app_pin");
+      setHasPin(!!pin);
+    };
     const getUser = async () => {
       const userStr = await Storage.getItem("user");
       if (userStr) {
@@ -34,7 +41,23 @@ export default function ProfileScreen() {
       }
     };
     getUser();
+    checkPin();
   }, []);
+
+  const handleRemovePin = async () => {
+    Alert.alert(pinTrans.remove, "Haqiqatan ham PIN-kodni o'chirmoqchimisiz?", [
+      { text: common.cancel, style: "cancel" },
+      {
+        text: common.delete,
+        style: "destructive",
+        onPress: async () => {
+          await Storage.removeItem("app_pin");
+          setHasPin(false);
+          Alert.alert("Muvaffaqiyatli", "PIN-kod o'chirildi");
+        },
+      },
+    ]);
+  };
 
   const handleLogout = async () => {
     try {
@@ -94,7 +117,7 @@ export default function ProfileScreen() {
             <MaterialCommunityIcons name="account" size={50} color="white" />
           </View>
           <Text style={[styles.userName, { color: colors.text }]}>
-            {user?.name || "Foydalanuvchi"}
+            {user?.fullName || "Foydalanuvchi"}
           </Text>
           <Text style={[styles.userRole, { color: colors.secondary }]}>
             {user?.role?.toUpperCase()}
@@ -105,6 +128,50 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
+          <TouchableOpacity
+            style={[styles.menuItem, { backgroundColor: colors.card }]}
+            onPress={() => (hasPin ? handleRemovePin() : router.push("/pin-setup"))}
+          >
+            <View style={styles.menuItemLeft}>
+              <MaterialCommunityIcons
+                name="shield-lock-outline"
+                size={24}
+                color={colors.primary}
+              />
+              <Text style={[styles.menuText, { color: colors.text }]}>
+                {hasPin ? pinTrans.remove : pinTrans.setup}
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name={hasPin ? "trash-can-outline" : "chevron-right"}
+              size={24}
+              color={hasPin ? colors.danger : colors.border}
+            />
+          </TouchableOpacity>
+
+          {hasPin && (
+            <TouchableOpacity
+              style={[styles.menuItem, { backgroundColor: colors.card }]}
+              onPress={() => router.push("/pin-setup")}
+            >
+              <View style={styles.menuItemLeft}>
+                <MaterialCommunityIcons
+                  name="shield-edit-outline"
+                  size={24}
+                  color={colors.primary}
+                />
+                <Text style={[styles.menuText, { color: colors.text }]}>
+                  PIN-kodni yangilash
+                </Text>
+              </View>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={24}
+                color={colors.border}
+              />
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={[styles.menuItem, { backgroundColor: colors.card }]}
             onPress={() => router.push("/privacy-policy")}

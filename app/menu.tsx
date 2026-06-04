@@ -264,8 +264,13 @@ export default function MenuScreen() {
                     {item.name}
                   </Text>
                   <Text style={[styles.itemPrice, { color: colors.secondary }]}>
-                    {item.price.toLocaleString()} {common.currency}
+                    Sotuv: {item.price.toLocaleString()} {common.currency}
                   </Text>
+                  {(item.costPrice !== undefined && item.costPrice > 0) && (
+                    <Text style={{ fontSize: 13, color: colors.primary, marginTop: 4, fontWeight: "bold" }}>
+                      Tan narxi: {item.costPrice.toLocaleString()} {common.currency}
+                    </Text>
+                  )}
                 </View>
                 <TouchableOpacity
                   style={styles.deleteBtn}

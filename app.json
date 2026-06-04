@@ -14,7 +14,7 @@
     "android": {
       "package": "com.rms.smart.boshqaruv",
       "versionCode": 2,
-      "softwareKeyboardLayoutMode": "resize",
+      "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",

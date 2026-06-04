@@ -1,6 +1,9 @@
+import { Platform } from "react-native";
+
 export const CONFIG = {
-  // Use "http://localhost:3000" for web testing on the same machine
-  // Use your machine's local IP (e.g. "http://192.168.x.x:3000") for mobile device testing
-  API_BASE_URL: "https://backend-rms-production.up.railway.app",
-  // API_BASE_URL: "http://localhost:3000",
+  // ✅ Haqiqiy telefon qurilmasi uchun kompyuterning IP manzilini ishlatish kerak
+  // localhost faqat emulatorda ishlaydi, haqiqiy telefonda ishlamaydi!
+  API_BASE_URL:
+    process.env.EXPO_PUBLIC_API_URL || 
+    (Platform.OS === 'web' ? "http://localhost:3001/api" : "http://10.50.4.5:3001/api"),
 };

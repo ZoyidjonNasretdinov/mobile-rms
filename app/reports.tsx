@@ -281,42 +281,42 @@ export default function ReportsScreen() {
                     styles.shiftStatusCard,
                     { backgroundColor: colors.card },
                     isShiftActive
-                      ? { borderColor: colors.success + "40", borderWidth: 1 }
-                      : { borderColor: colors.danger + "40", borderWidth: 1 },
+                      ? { borderColor: colors.success + "20", borderWidth: 1 }
+                      : { borderColor: colors.danger + "20", borderWidth: 1 },
                   ]}
                 >
-                  <View style={styles.shiftInfo}>
-                    <View
-                      style={[
-                        styles.statusIndicator,
-                        {
-                          backgroundColor: isShiftActive
-                            ? colors.success
-                            : colors.danger,
-                        },
-                      ]}
-                    />
-                    <Text
-                      style={[styles.shiftLabel, { color: colors.secondary }]}
-                    >
-                      {dash.shiftStatus}:{" "}
+                  <View style={styles.shiftHeaderRow}>
+                    <View style={styles.shiftInfo}>
+                      <View
+                        style={[
+                          styles.statusIndicator,
+                          {
+                            backgroundColor: isShiftActive
+                              ? colors.success
+                              : colors.danger,
+                          },
+                        ]}
+                      />
                       <Text
-                        style={{
-                          color: isShiftActive ? colors.success : colors.danger,
-                          fontWeight: "bold",
-                        }}
+                        style={[styles.shiftLabel, { color: colors.secondary }]}
                       >
-                        {isShiftActive ? dash.active : dash.closed}
+                        {dash.shiftStatus}:{" "}
+                        <Text
+                          style={{
+                            color: isShiftActive ? colors.success : colors.danger,
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {isShiftActive ? dash.active : dash.closed}
+                        </Text>
                       </Text>
-                    </Text>
-                  </View>
-
-                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    </View>
+                    
                     {activeShift && (
                       <TouchableOpacity
                         style={[
-                          styles.shiftActionBtn,
-                          { backgroundColor: colors.primary },
+                          styles.shiftDetailsBtn,
+                          { backgroundColor: colors.primary + "15" },
                         ]}
                         onPress={() =>
                           router.push({
@@ -326,17 +326,20 @@ export default function ReportsScreen() {
                         }
                       >
                         <MaterialCommunityIcons
-                          name="file-chart-outline"
+                          name="file-chart"
                           size={18}
-                          color="white"
+                          color={colors.primary}
                         />
+                        <Text style={[styles.shiftDetailsText, { color: colors.primary }]}>Hisobot</Text>
                       </TouchableOpacity>
                     )}
+                  </View>
 
+                  <View style={styles.shiftActionRow}>
                     {!isShiftActive ? (
                       <TouchableOpacity
                         style={[
-                          styles.shiftActionBtn,
+                          styles.shiftMainBtn,
                           { backgroundColor: colors.success },
                         ]}
                         onPress={() => {
@@ -345,18 +348,18 @@ export default function ReportsScreen() {
                         }}
                       >
                         <MaterialCommunityIcons
-                          name="play-circle-outline"
-                          size={20}
+                          name="play-circle"
+                          size={24}
                           color="white"
                         />
-                        <Text style={styles.shiftActionText}>
+                        <Text style={styles.shiftMainBtnText}>
                           {dash.startDay}
                         </Text>
                       </TouchableOpacity>
                     ) : (
                       <TouchableOpacity
                         style={[
-                          styles.shiftActionBtn,
+                          styles.shiftMainBtn,
                           { backgroundColor: colors.danger },
                         ]}
                         onPress={() => {
@@ -365,11 +368,11 @@ export default function ReportsScreen() {
                         }}
                       >
                         <MaterialCommunityIcons
-                          name="stop-circle-outline"
-                          size={20}
+                          name="stop-circle"
+                          size={24}
                           color="white"
                         />
-                        <Text style={styles.shiftActionText}>
+                        <Text style={styles.shiftMainBtnText} numberOfLines={1}>
                           {dash.endDay}
                         </Text>
                       </TouchableOpacity>
@@ -426,9 +429,11 @@ export default function ReportsScreen() {
                           styles.bar,
                           {
                             backgroundColor: colors.success,
-                            height: ((s.rev || 0) / MaxValue) * 120,
-                            borderTopLeftRadius: 4,
-                            borderTopRightRadius: 4,
+                            height: Math.max(((s.rev || 0) / MaxValue) * 140, 4),
+                            borderTopLeftRadius: 6,
+                            borderTopRightRadius: 6,
+                            borderBottomLeftRadius: 2,
+                            borderBottomRightRadius: 2,
                           },
                         ]}
                       />
@@ -437,10 +442,12 @@ export default function ReportsScreen() {
                           styles.bar,
                           {
                             backgroundColor: colors.danger,
-                            height: ((s.exp || 0) / MaxValue) * 120,
-                            borderTopLeftRadius: 4,
-                            borderTopRightRadius: 4,
-                            marginLeft: 2,
+                            height: Math.max(((s.exp || 0) / MaxValue) * 140, 4),
+                            borderTopLeftRadius: 6,
+                            borderTopRightRadius: 6,
+                            borderBottomLeftRadius: 2,
+                            borderBottomRightRadius: 2,
+                            marginLeft: 4,
                           },
                         ]}
                       />
@@ -594,138 +601,181 @@ export default function ReportsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", padding: 20, gap: 15 },
-  backButton: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: "bold", flex: 1 },
+  header: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    paddingHorizontal: 20, 
+    paddingTop: 10,
+    paddingBottom: 20,
+    gap: 15 
+  },
+  backButton: { 
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: { fontSize: 22, fontWeight: "800", flex: 1 },
   headerBtn: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
   },
   periodSelector: {
     flexDirection: "row",
     paddingHorizontal: 20,
-    gap: 10,
-    marginBottom: 15,
+    paddingVertical: 6,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.03)",
+    gap: 6,
+    marginBottom: 20,
   },
   periodBtn: {
     flex: 1,
-    height: 40,
-    borderRadius: 10,
+    height: 38,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },
-  scrollContent: { padding: 20 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   chartContainer: { padding: 20, borderRadius: 24, marginBottom: 20 },
   chartHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 25,
   },
-  boxTitle: { fontSize: 16, fontWeight: "bold" },
-  legend: { flexDirection: "row", gap: 12 },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 11, fontWeight: "600" },
+  boxTitle: { fontSize: 17, fontWeight: "800" },
+  legend: { flexDirection: "row", gap: 14 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendText: { fontSize: 12, fontWeight: "700" },
   chartArea: {
     flexDirection: "row",
-    height: 200,
+    height: 220,
     alignItems: "flex-end",
     justifyContent: "space-between",
-    paddingTop: 20,
+    paddingTop: 10,
+    paddingHorizontal: 5,
   },
-  chartCol: { alignItems: "center", gap: 8, flex: 1 },
+  chartCol: { alignItems: "center", gap: 12, flex: 1 },
   barGroup: { flexDirection: "row", alignItems: "flex-end" },
-  bar: { width: 12 },
+  bar: { width: 14 },
   chartLabel: {
-    fontSize: 10,
-    fontWeight: "600",
+    fontSize: 11,
+    fontWeight: "700",
     textAlign: "center",
     width: "100%",
+    marginTop: 4,
   },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 25,
   },
   statCard: {
     width: "48%",
-    padding: 15,
-    borderRadius: 20,
+    padding: 18,
+    borderRadius: 22,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
   },
-  statTitle: { fontSize: 11, fontWeight: "600", marginBottom: 2 },
-  statValue: { fontSize: 13, fontWeight: "bold" },
+  statTitle: { fontSize: 11, fontWeight: "700", marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statValue: { fontSize: 15, fontWeight: "800" },
   chartBox: { padding: 20, borderRadius: 24, marginBottom: 20 },
   topItemRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
-    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(0,0,0,0.05)",
+    gap: 14,
   },
   rankBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
   },
-  itemName: { fontSize: 14, fontWeight: "500" },
-  itemCount: { fontSize: 13, fontWeight: "bold" },
+  itemName: { fontSize: 15, fontWeight: "700", marginBottom: 2 },
+  itemCount: { fontSize: 14, fontWeight: "800" },
   exportBtn: {
-    height: 56,
-    borderRadius: 16,
+    height: 60,
+    borderRadius: 20,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     marginTop: 10,
   },
-  exportBtnText: { color: "white", fontSize: 16, fontWeight: "bold" },
-  shiftSection: { marginBottom: 20 },
+  exportBtnText: { color: "white", fontSize: 16, fontWeight: "800" },
+  shiftSection: { marginBottom: 25 },
   shiftStatusCard: {
-    padding: 16,
-    borderRadius: 20,
+    padding: 20,
+    borderRadius: 24,
+    gap: 15,
+  },
+  shiftHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   shiftInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
-  statusIndicator: { width: 10, height: 10, borderRadius: 5 },
-  shiftLabel: { fontSize: 14 },
-  shiftActionBtn: {
+  statusIndicator: { width: 12, height: 12, borderRadius: 6 },
+  shiftLabel: { fontSize: 15, fontWeight: "600" },
+  shiftDetailsBtn: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
     gap: 6,
   },
-  shiftActionText: { color: "white", fontSize: 13, fontWeight: "bold" },
+  shiftDetailsText: { fontSize: 12, fontWeight: "700" },
+  shiftActionRow: {
+    marginTop: 5,
+  },
+  shiftMainBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 56,
+    borderRadius: 16,
+    gap: 10,
+    paddingHorizontal: 20,
+  },
+  shiftMainBtnText: { color: "white", fontSize: 16, fontWeight: "800" },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "flex-end",
   },
   modalContent: {
     padding: 24,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    minHeight: 350,
+    minHeight: 380,
+    paddingBottom: 40,
   },
   modalHeader: {
     flexDirection: "row",
@@ -733,21 +783,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 24,
   },
-  modalTitle: { fontSize: 20, fontWeight: "bold" },
+  modalTitle: { fontSize: 22, fontWeight: "800" },
   modalBody: { marginBottom: 30 },
-  inputLabel: { fontSize: 14, marginBottom: 12 },
+  inputLabel: { fontSize: 15, marginBottom: 15, fontWeight: "600" },
   modalInput: {
-    height: 60,
-    borderRadius: 16,
+    height: 70,
+    borderRadius: 18,
     paddingHorizontal: 20,
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 28,
+    fontWeight: "900",
+    textAlign: "center",
   },
   modalBtn: {
-    height: 56,
-    borderRadius: 16,
+    height: 60,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
   },
-  modalBtnText: { color: "white", fontSize: 16, fontWeight: "bold" },
+  modalBtnText: { color: "white", fontSize: 18, fontWeight: "800" },
 });

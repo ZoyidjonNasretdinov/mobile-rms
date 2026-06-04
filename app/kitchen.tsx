@@ -9,13 +9,13 @@ import {
   RefreshControl,
   Alert,
   Dimensions,
-  TextInput,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Storage } from "@/utils/storage";
 import axios from "axios";
 import { CONFIG } from "@/constants/config";
@@ -23,11 +23,7 @@ import { socketService } from "@/utils/socket";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { notificationService } from "@/utils/notifications";
-import {
-  Gesture,
-  GestureDetector,
-  TouchableOpacity as GHTouchableOpacity,
-} from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -38,10 +34,10 @@ import Animated, {
 } from "react-native-reanimated";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.2; // Lowered from 0.3 for easier trigger
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.2;
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
-type KitchenTab = "Pending" | "Cooking" | "Ready" | "Inventory";
+type KitchenTab = "Pending" | "Ready" | "History";
 
 interface SwipeableItemProps {
   item: any;
@@ -54,9 +50,7 @@ interface SwipeableItemProps {
 const safeHaptics = async (type: Haptics.NotificationFeedbackType) => {
   try {
     await Haptics.notificationAsync(type);
-  } catch {
-    // Ignore haptics error on web/unsupported
-  }
+  } catch {}
 };
 
 const SwipeableItem = ({
@@ -69,9 +63,7 @@ const SwipeableItem = ({
   const translateX = useSharedValue(0);
   const matchingItems = item.matchingItems || [];
   const status = matchingItems[0]?.status || "Pending";
-  const isAnyReversed = matchingItems.some((i: any) => i.isReversed);
 
-  // Reset swipe position when item or status changes
   useEffect(() => {
     translateX.value = withSpring(0);
   }, [item._id, status, translateX]);
@@ -88,7 +80,7 @@ const SwipeableItem = ({
       if (!canSwipeLeft && x < 0) x = x * 0.2;
       translateX.value = x;
     })
-    .onEnd((event) => {
+    .onEnd(() => {
       if (canSwipeRight && translateX.value > SWIPE_THRESHOLD) {
         runOnJS(safeHaptics)(Haptics.NotificationFeedbackType.Success);
         runOnJS(onSwipeRight)(item._id, matchingItems);
@@ -102,18 +94,15 @@ const SwipeableItem = ({
       }
     });
 
-  const rStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: translateX.value }],
-      // Border color pulse
-      borderColor: interpolateColor(
-        Math.abs(translateX.value),
-        [0, SWIPE_THRESHOLD],
-        ["transparent", colors.primary + "40"],
-      ),
-      borderWidth: 1,
-    };
-  });
+  const rStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+    borderColor: interpolateColor(
+      Math.abs(translateX.value),
+      [0, SWIPE_THRESHOLD],
+      ["transparent", colors.primary + "40"],
+    ),
+    borderWidth: 1,
+  }));
 
   const rIconLeftStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
@@ -133,71 +122,38 @@ const SwipeableItem = ({
     ),
   }));
 
-  const config = (() => {
-    switch (status) {
-      case "Ready":
-        return { color: colors.success, label: "Tayyor", icon: "check-circle" };
-      case "Cooking":
-        return { color: colors.primary, label: "Jarayonda", icon: "fire" };
-      default:
-        return {
-          color: colors.accent,
-          label: "Navbatda",
-          icon: "clock-outline",
-        };
-    }
-  })();
-
   return (
     <View style={styles.swipeContainer}>
       <Animated.View
         style={[
           styles.swipeBack,
+          { backgroundColor: colors.success + "20" },
           rIconLeftStyle,
-          { backgroundColor: "#10B981" }, // Solid green
         ]}
       >
-        <MaterialCommunityIcons
-          name="arrow-right-bold"
-          size={32}
-          color="white"
-        />
+        <MaterialCommunityIcons name="check" size={28} color={colors.success} />
       </Animated.View>
       <Animated.View
         style={[
           styles.swipeBack,
           styles.swipeBackRight,
+          { backgroundColor: colors.accent + "20" },
           rIconRightStyle,
-          { backgroundColor: "#EF4444" }, // Solid red
         ]}
       >
-        <MaterialCommunityIcons
-          name="arrow-left-bold"
-          size={32}
-          color="white"
-        />
+        <MaterialCommunityIcons name="undo" size={28} color={colors.accent} />
       </Animated.View>
 
       <GestureDetector gesture={gesture}>
         <Animated.View
-          style={[
-            styles.itemCard,
-            { backgroundColor: colors.card },
-            isAnyReversed && {
-              backgroundColor: "#FFF1F0",
-              borderColor: "#FF4D4F",
-              borderWidth: 1.5,
-              borderStyle: "dashed",
-            },
-            rStyle,
-          ]}
+          style={[styles.itemCard, { backgroundColor: colors.card }, rStyle]}
         >
-          <GHTouchableOpacity
-            activeOpacity={0.8}
+          <TouchableOpacity
+            activeOpacity={0.9}
             onPress={() => onPress(item._id)}
           >
             <View style={styles.itemHeader}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View
                   style={[
                     styles.tableBadge,
@@ -208,154 +164,121 @@ const SwipeableItem = ({
                     Stol {item.tableName}
                   </Text>
                 </View>
-                <View
-                  style={[
-                    styles.orderIdBadge,
-                    { backgroundColor: colors.secondary + "15" },
-                  ]}
-                >
-                  <Text
-                    style={[styles.orderIdText, { color: colors.secondary }]}
-                  >
-                    #{item._id.slice(-4).toUpperCase()}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>
+                    {item.waiterName || "Staff"}
                   </Text>
+                  <Text style={{ fontSize: 10, color: colors.secondary }}>Buyurtma oldi</Text>
                 </View>
               </View>
-              <View
-                style={[
-                  styles.statusBadge,
-                  {
-                    backgroundColor: isAnyReversed
-                      ? "#FF4D4F"
-                      : config.color + "15",
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name={isAnyReversed ? "alert-circle" : (config.icon as any)}
-                  size={14}
-                  color={isAnyReversed ? "white" : config.color}
-                />
-                <Text
-                  style={[
-                    styles.statusText,
-                    { color: isAnyReversed ? "white" : config.color },
-                  ]}
-                >
-                  {isAnyReversed ? "Qaytarilgan" : config.label}
+              <View style={styles.orderIdBadge}>
+                <Text style={[styles.orderIdText, { color: colors.secondary }]}>
+                  #{item._id.slice(-4).toUpperCase()}
                 </Text>
               </View>
             </View>
 
             <View style={styles.itemBodyList}>
-              {matchingItems.map((subItem: any, idx: number) => (
-                <View key={idx} style={styles.itemBodyRow}>
-                  <Text style={[styles.itemQty, { color: colors.text }]}>
-                    {subItem.quantity}x
+              {matchingItems.map((bi: any, index: number) => (
+                <View key={index} style={styles.itemBodyRow}>
+                  <Text style={[styles.itemQty, { color: colors.primary }]}>
+                    {bi.quantity}x
                   </Text>
-                  <Text style={[styles.itemName, { color: colors.text }]}>
-                    {subItem.name}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemName, { color: colors.text }]}>
+                      {bi.name}
+                    </Text>
+                    {bi.comment && (
+                      <Text
+                        style={{
+                          color: colors.danger,
+                          fontSize: 13,
+                          fontWeight: "500",
+                          marginTop: 2,
+                        }}
+                      >
+                        ⚠️ {bi.comment}
+                      </Text>
+                    )}
+                    {bi.completedBy && (
+                      <Text
+                        style={{
+                          color: colors.success,
+                          fontSize: 11,
+                          fontWeight: "500",
+                          marginTop: 2,
+                        }}
+                      >
+                        ✅ {bi.completedBy} tomonidan tayyorlandi
+                      </Text>
+                    )}
+                  </View>
                 </View>
               ))}
             </View>
 
             <View style={styles.itemFooter}>
+              <Text style={[styles.timeText, { color: colors.secondary }]}>
+                {new Date(item.createdAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Text>
               <View style={styles.footerInfo}>
-                <View style={styles.infoBadge}>
-                  <MaterialCommunityIcons
-                    name="table-chair"
-                    size={14}
-                    color={colors.secondary}
-                  />
-                  <Text style={[styles.infoText, { color: colors.secondary }]}>
-                    Stol {item.tableName}
+                <View
+                  style={[
+                    styles.statusBadge,
+                    {
+                      backgroundColor:
+                        status === "Ready"
+                          ? colors.success + "15"
+                          : colors.accent + "15",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusText,
+                      {
+                        color:
+                          status === "Ready" ? colors.success : colors.accent,
+                      },
+                    ]}
+                  >
+                    {status === "Ready" ? "Tayyor" : "Navbatda"}
                   </Text>
                 </View>
-                <View style={styles.infoSeparator} />
-                <View style={styles.infoBadge}>
-                  <MaterialCommunityIcons
-                    name="account-outline"
-                    size={14}
-                    color={colors.secondary}
-                  />
-                  <Text style={[styles.infoText, { color: colors.secondary }]}>
-                    {item.waiterName || "Ofitsiant"}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.itemFooterRight}>
-                <Text style={[styles.timeText, { color: colors.secondary }]}>
-                  {new Date(item.createdAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Text>
               </View>
             </View>
-          </GHTouchableOpacity>
+          </TouchableOpacity>
         </Animated.View>
       </GestureDetector>
     </View>
   );
 };
 
-const getRoleConfig = (role: string, colors: any) => {
-  switch (role?.toLowerCase()) {
-    case "shashlikchi":
-      return {
-        title: "Shashlik Station",
-        color: "#EF4444",
-        icon: "fire",
-        label: "Shashlikchi",
-      };
-    case "salatchi":
-      return {
-        title: "Salat Station",
-        color: "#10B981",
-        icon: "leaf",
-        label: "Salatchi",
-      };
-    case "bar":
-      return {
-        title: "Bar Station",
-        color: "#3B82F6",
-        icon: "glass-cocktail",
-        label: "Barman",
-      };
-    case "oshpaz":
-      return {
-        title: "Oshpaz Station",
-        color: "#F59E0B",
-        icon: "chef-hat",
-        label: "Oshpaz",
-      };
-    default:
-      return {
-        title: "Station",
-        color: colors.primary,
-        icon: "silverware-fork-knife",
-        label: "Xodim",
-      };
-  }
-};
-
 export default function KitchenScreen() {
   const router = useRouter();
+  const { dept: paramDept, tab: paramTab } = useLocalSearchParams();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
 
-  const [activeTab, setActiveTab] = useState<KitchenTab>("Pending");
+  const [activeTab, setActiveTab] = useState<KitchenTab>(
+    (paramTab as KitchenTab) || "Pending",
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
-  const [pendingTransfers, setPendingTransfers] = useState<any[]>([]);
-  const [myStock, setMyStock] = useState<any[]>([]);
-  const [inventorySearch, setInventorySearch] = useState("");
+  const [historyOrders, setHistoryOrders] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<any[]>([]);
+  const [shiftDetailsModal, setShiftDetailsModal] = useState(false);
+  const [shiftOrders, setShiftOrders] = useState<any[]>([]);
+  const [loadingShift, setLoadingShift] = useState(false);
+  const [selectedShift, setSelectedShift] = useState<any>(null);
+
   const [user, setUser] = useState<any>(null);
   const userRef = useRef<any>(null);
 
-  // Load user once on mount (separated from fetchOrders to avoid infinite loop)
   useEffect(() => {
     const loadUser = async () => {
       const userStr = await Storage.getItem("user");
@@ -371,11 +294,17 @@ export default function KitchenScreen() {
   const fetchOrders = async () => {
     try {
       const token = await Storage.getItem("access_token");
-
-      const response = await axios.get(`${API_BASE_URL}/orders`, {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 10000,
-      });
+      const [response, historyRes, shiftsRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/orders`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_BASE_URL}/orders?status=Paid`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_BASE_URL}/shifts`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
 
       const roleDeptMap = {
         shashlikchi: "shashlikchi",
@@ -383,91 +312,41 @@ export default function KitchenScreen() {
         salatchi: "salatchi",
         bar: "bar",
       };
-
       const userObj = userRef.current || {};
-      const myDept = roleDeptMap[userObj.role as keyof typeof roleDeptMap];
-      const allOrders = response.data || [];
+      const myDept =
+        (paramDept as string) ||
+        roleDeptMap[userObj.role as keyof typeof roleDeptMap];
 
-      if (userObj.role === "owner") {
-        setOrders(allOrders.filter((o: any) => o.status !== "Paid"));
-      } else {
-        const filtered = allOrders
-          .filter((o: any) => o.status !== "Paid")
+      const processOrders = (orderList: any[]) =>
+        orderList
           .map((order: any) => {
-            // Keep original index to ensure backend updates reach the correct item
             const myItems = (order.items || [])
               .map((item: any, originalIndex: number) => ({
                 ...item,
                 originalIndex,
               }))
               .filter((item: any) => item.department === myDept);
-
             return myItems.length > 0 ? { ...order, items: myItems } : null;
           })
           .filter(Boolean);
-        setOrders(filtered);
-      }
-    } catch {
-      console.error("Kitchen fetch error:");
+
+      setOrders(processOrders(response.data || []));
+      setHistoryOrders(processOrders(historyRes.data || []));
+      setShifts(shiftsRes.data || []);
+    } catch (e: any) {
+      console.log("Kitchen fetch error:", e?.message || e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const fetchInventory = async () => {
-    try {
-      const token = await Storage.getItem("access_token");
-      const userObj = userRef.current || {};
-      const dept = userObj.role?.toLowerCase();
-      if (!dept) return;
-
-      const [transfersRes, stockRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/inventory/transfers/${dept}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`${API_BASE_URL}/inventory/staff/${dept}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ]);
-
-      setPendingTransfers(transfersRes.data);
-      setMyStock(stockRes.data);
-    } catch {
-      console.error("Inventory fetch error:");
-    }
-  };
-
-  const handleConfirmTransfer = async (id: string, status: string) => {
-    try {
-      const token = await Storage.getItem("access_token");
-      await axios.post(
-        `${API_BASE_URL}/inventory/transfers/${id}/confirm`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      Alert.alert(
-        "Muvaffaqiyat",
-        status === "ACCEPTED" ? "Qabul qilindi" : "Rad etildi",
-      );
-      fetchInventory();
-    } catch {
-      Alert.alert("Xato", "Amalni bajarib bo'lmadi");
-    }
-  };
-
-  // Fetch orders once user is loaded
   useEffect(() => {
-    if (user !== null) {
-      fetchOrders();
-      fetchInventory();
-    }
+    if (user !== null) fetchOrders();
   }, [user]);
 
-  // Set up socket listeners once on mount (using ref to avoid re-registering)
   useEffect(() => {
     const socket = socketService.getSocket();
-
     const roleDeptMap = {
       shashlikchi: "shashlikchi",
       oshpaz: "oshpaz",
@@ -475,170 +354,51 @@ export default function KitchenScreen() {
       bar: "bar",
     };
 
-    socket.on("orderCreated", (newOrder: any) => {
+    const handleUpdate = (order: any) => {
       const currentUser = userRef.current;
-      const myDept = roleDeptMap[currentUser?.role as keyof typeof roleDeptMap];
-      if (currentUser?.role === "owner") {
-        setOrders((prev) => [newOrder, ...prev]);
-        return;
-      }
-      const myItems = (newOrder.items || [])
-        .map((item: any, originalIndex: number) => ({
-          ...item,
-          originalIndex,
-        }))
+      const myDept =
+        paramDept || roleDeptMap[currentUser?.role as keyof typeof roleDeptMap];
+      const myItems = (order.items || [])
+        .map((item: any, originalIndex: number) => ({ ...item, originalIndex }))
         .filter((item: any) => item.department === myDept);
 
       if (myItems.length > 0) {
-        setOrders((prev) => [{ ...newOrder, items: myItems }, ...prev]);
-        notificationService.notify(
-          "Yangi buyurtma tushdi!",
-          Haptics.NotificationFeedbackType.Success,
-          "kitchen",
-        );
-        const roleGreeting =
-          currentUser?.role === "shashlikchi"
-            ? "Shashlikchi"
-            : currentUser?.role === "bar"
-              ? "Barmen"
-              : "Oshpaz";
-        Speech.speak(`${roleGreeting}, yangi buyurtma`, { language: "uz-UZ" });
-      }
-    });
+        setOrders((prev) => {
+          const exists = prev.find((o) => o._id === order._id);
+          if (exists)
+            return prev.map((o) =>
+              o._id === order._id ? { ...order, items: myItems } : o,
+            );
+          return [{ ...order, items: myItems }, ...prev];
+        });
 
-    socket.on("orderUpdated", (updatedOrder: any) => {
-      const currentUser = userRef.current;
-      const myDept = roleDeptMap[currentUser?.role as keyof typeof roleDeptMap];
-
-      setOrders((prev) => {
-        const existingOrder = prev.find((o) => o._id === updatedOrder._id);
-        const isExisting = !!existingOrder;
-
-        if (currentUser?.role === "owner") {
-          return prev.map((o) =>
-            o._id === updatedOrder._id ? updatedOrder : o,
+        if (order.status !== "Paid") {
+          notificationService.notify(
+            "Buyurtma yangilanishi",
+            Haptics.NotificationFeedbackType.Success,
+            "kitchen",
           );
         }
-
-        const myItems = (updatedOrder.items || [])
-          .map((item: any, originalIndex: number) => ({
-            ...item,
-            originalIndex,
-          }))
-          .filter((item: any) => item.department === myDept);
-
-        if (myItems.length > 0) {
-          // If items were added to an existing order, or it's a new relevant update
-          if (
-            isExisting &&
-            myItems.length > (existingOrder.items?.length || 0)
-          ) {
-            notificationService.notify(
-              "Buyurtma yangilandi!",
-              Haptics.NotificationFeedbackType.Warning,
-              "kitchen",
-            );
-            const roleGreeting =
-              currentUser?.role === "shashlikchi"
-                ? "Shashlikchi"
-                : currentUser?.role === "bar"
-                  ? "Barmen"
-                  : "Oshpaz";
-            Speech.speak(`${roleGreeting}, buyurtma yangilandi`, {
-              language: "uz-UZ",
-            });
-          } else if (!isExisting) {
-            notificationService.notify(
-              "Yangi buyurtma (yangilanish)!",
-              Haptics.NotificationFeedbackType.Success,
-              "kitchen",
-            );
-            const roleGreeting =
-              currentUser?.role === "shashlikchi"
-                ? "Shashlikchi"
-                : currentUser?.role === "bar"
-                  ? "Barmen"
-                  : "Oshpaz";
-            Speech.speak(`${roleGreeting}, yangi buyurtma`, {
-              language: "uz-UZ",
-            });
-          }
-
-          if (isExisting) {
-            return prev.map((o) =>
-              o._id === updatedOrder._id
-                ? { ...updatedOrder, items: myItems }
-                : o,
-            );
-          } else {
-            return [{ ...updatedOrder, items: myItems }, ...prev];
-          }
-        } else {
-          return prev.filter((o) => o._id !== updatedOrder._id);
-        }
-      });
-    });
-
-    socket.on("transferCreated", (newTransfer: any) => {
-      const currentUser = userRef.current;
-      const myDept = roleDeptMap[currentUser?.role as keyof typeof roleDeptMap];
-      if (newTransfer.to === myDept) {
-        setPendingTransfers((prev) => [newTransfer, ...prev]);
-        safeHaptics(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setOrders((prev) => prev.filter((o) => o._id !== order._id));
       }
-    });
+    };
 
-    socket.on("transferUpdated", (updatedTransfer: any) => {
-      const currentUser = userRef.current;
-      const myDept = roleDeptMap[currentUser?.role as keyof typeof roleDeptMap];
-      if (updatedTransfer.to === myDept) {
-        setPendingTransfers((prev) =>
-          prev.filter((t) => t._id !== updatedTransfer._id),
-        );
-        fetchInventory(); // Refresh stock balance
-      }
-    });
-
-    socket.on("dayStarted", () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Speech.speak("Ish kuni boshlandi. Baraka bersin!", {
-        language: "uz-UZ",
-        pitch: 1.0,
-        rate: 0.9,
-      });
-      fetchOrders();
-      fetchInventory();
-    });
-
-    socket.on("dayEnded", () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      Speech.speak("Ish kuni yakunlandi. Charchamang!", {
-        language: "uz-UZ",
-        pitch: 1.0,
-        rate: 0.9,
-      });
-      fetchOrders();
-      fetchInventory();
-    });
-
-    socket.on("stockUpdated", fetchInventory);
-    socket.on("staffStockUpdated", fetchInventory);
+    socket.on("orderCreated", handleUpdate);
+    socket.on("orderUpdated", handleUpdate);
+    socket.on("dayStarted", fetchOrders);
+    socket.on("dayEnded", fetchOrders);
 
     return () => {
-      socket.off("orderCreated");
-      socket.off("orderUpdated");
-      socket.off("transferCreated");
-      socket.off("transferUpdated");
-      socket.off("stockUpdated");
-      socket.off("dayStarted");
-      socket.off("dayEnded");
+      socket.off("orderCreated", handleUpdate);
+      socket.off("orderUpdated", handleUpdate);
+      socket.off("dayStarted", fetchOrders);
+      socket.off("dayEnded", fetchOrders);
     };
   }, []);
 
-  const handleLogout = async () => {
-    await Storage.removeItem("access_token");
-    await Storage.removeItem("user");
-    router.replace("/login");
+  const handleHeaderAction = async () => {
+    router.back();
   };
 
   const updateItemsStatus = async (
@@ -653,101 +413,117 @@ export default function KitchenScreen() {
         { itemIndices, status: newStatus },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      // Fallback refetch to ensure UI updates even if socket is slow
       fetchOrders();
-    } catch {
-      console.error("Status update error:");
+    } catch (e: any) {
+      console.log("Status update error:", e?.message || e);
       Alert.alert("Xatolik", "Statusni yangilab bo'lmadi");
     }
   };
 
-  const handleSwipeRight = (orderId: string, items: any[]) => {
-    if (items.length === 0) return;
-    const current = items[0].status;
-    let next = current;
-    if (current === "Pending") next = "Cooking";
-    else if (current === "Cooking") next = "Ready";
+  const handleViewShiftDetails = async (shift: any) => {
+    setSelectedShift(shift);
+    setShiftDetailsModal(true);
+    setLoadingShift(true);
+    try {
+      const token = await Storage.getItem("access_token");
+      const url = `${API_BASE_URL}/orders/stats?startDate=${shift.startTime}${shift.endTime ? `&endDate=${shift.endTime}` : ""}`;
+      const res = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      const roleDeptMap = {
+        shashlikchi: "shashlikchi",
+        oshpaz: "oshpaz",
+        salatchi: "salatchi",
+        bar: "bar",
+      };
+      const userObj = userRef.current || {};
+      const myDept =
+        (paramDept as string) ||
+        roleDeptMap[userObj.role as keyof typeof roleDeptMap];
 
-    if (next !== current) {
-      updateItemsStatus(
-        orderId,
-        items.map((i) => i.index),
-        next,
-      );
+      const ordersList = res.data.orders || [];
+      const processOrders = (orderList: any[]) =>
+        orderList
+          .map((order: any) => {
+            const myItems = (order.items || [])
+              .map((item: any, originalIndex: number) => ({
+                ...item,
+                originalIndex,
+              }))
+              .filter((item: any) => item.department === myDept);
+            return myItems.length > 0 ? { ...order, items: myItems } : null;
+          })
+          .filter(Boolean);
+
+      setShiftOrders(processOrders(ordersList));
+    } catch (e: any) {
+      console.log("Failed to fetch shift details", e?.message || e);
+      Alert.alert("Xatolik", "Smena malumotlarini yuklab bo'lmadi");
+    } finally {
+      setLoadingShift(false);
     }
   };
 
-  const handleSwipeLeft = (orderId: string, items: any[]) => {
-    if (items.length === 0) return;
-    const current = items[0].status;
-
-    if (current === "Ready") {
-      Alert.alert(
-        "Ehtiyot bo'ling!",
-        "Tayyor bo'lgan mahsulotlarni qayta jarayonga qaytarmoqchimisiz?",
-        [
-          { text: "Yo'q", style: "cancel" },
-          {
-            text: "Ha, qaytarish",
-            style: "destructive",
-            onPress: () =>
-              updateItemsStatus(
-                orderId,
-                items.map((i) => i.index),
-                "Cooking",
-              ),
-          },
-        ],
-      );
-      return;
-    }
-
-    let next = current;
-    if (current === "Cooking") next = "Pending";
-
-    if (next !== current) {
-      updateItemsStatus(
-        orderId,
-        items.map((i) => i.index),
-        next,
-      );
-    }
-  };
-
-  const getFilteredItems = () => {
-    const grouped: any[] = [];
-    orders.forEach((order) => {
+  const filteredItems = (orders)
+    .reduce((acc, order) => {
       const matchingItems = (order.items || [])
-        .map((item: any) => ({
-          ...item,
-          index: item.originalIndex ?? 0, // Fallback if somehow missing
-        }))
+        .map((item: any) => ({ ...item, index: item.originalIndex ?? 0 }))
         .filter((item: any) => item.status === activeTab);
 
       if (matchingItems.length > 0) {
-        grouped.push({
-          ...order,
-          matchingItems,
-          createdAt: order.createdAt || new Date().toISOString(),
-        });
+        acc.push({ ...order, matchingItems });
       }
+      return acc;
+    }, [] as any[])
+    .sort((a: any, b: any) => {
+      return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
     });
-
-    return grouped.sort(
-      (a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    );
-  };
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchOrders();
-    fetchInventory();
   };
 
-  const filteredItems = getFilteredItems();
+  const getRoleConfig = (role: string) => {
+    const r = role?.toLowerCase();
+    if (r === "oshpaz")
+      return {
+        label: "OSHPAZ",
+        title: "Oshxona Stansiyasi",
+        color: "#FF9F1C",
+        icon: "chef-hat",
+      };
+    if (r === "shashlikchi")
+      return {
+        label: "SHASHLIKCHI",
+        title: "Mangal Stansiyasi",
+        color: "#EF4444",
+        icon: "fire",
+      };
+    if (r === "salatchi")
+      return {
+        label: "SALATCHI",
+        title: "Salatlar Bo'limi",
+        color: "#10B981",
+        icon: "leaf",
+      };
+    if (r === "bar")
+      return {
+        label: "BARMEN",
+        title: "Bar Stansiyasi",
+        color: "#3B82F6",
+        icon: "glass-cocktail",
+      };
+    return {
+      label: "STAFF",
+      title: "Ishchi Stansiyasi",
+      color: colors.primary,
+      icon: "account-hard-hat",
+    };
+  };
 
-  const roleConfig = getRoleConfig(user?.role, colors);
+  const roleConfig = getRoleConfig((paramDept as string) || user?.role);
 
   return (
     <View style={{ flex: 1 }}>
@@ -777,341 +553,81 @@ export default function KitchenScreen() {
                 <Text style={styles.headerTitle}>{roleConfig.title}</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <MaterialCommunityIcons name="logout" size={24} color="white" />
+            <TouchableOpacity
+              style={styles.logoutBtn}
+              onPress={handleHeaderAction}
+            >
+              <MaterialCommunityIcons
+                name={
+                  user?.role === "owner" || paramDept ? "arrow-left" : "logout"
+                }
+                size={24}
+                color="white"
+              />
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.tabsContainer}>
-          {(["Pending", "Cooking", "Ready", "Inventory"] as KitchenTab[]).map(
-            (type) => {
-              let count = 0;
-              if (type === "Inventory") {
-                count = pendingTransfers.length;
-              } else {
-                count = orders.reduce(
-                  (acc, o) =>
-                    acc +
-                    (o.items || []).filter((i: any) => i.status === type)
-                      .length,
-                  0,
-                );
-              }
-              const label =
-                type === "Pending"
-                  ? "Navbat"
-                  : type === "Cooking"
-                    ? "Jarayon"
+          {(["Pending", "Ready", "History"] as KitchenTab[]).map((type) => {
+            const list = type === "History" ? historyOrders : orders;
+            const count = list.reduce(
+              (acc, o) =>
+                acc +
+                (o.items || []).filter((i: any) =>
+                  type === "History" ? true : i.status === type,
+                ).length,
+              0,
+            );
+            return (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.tabItem,
+                  activeTab === type && {
+                    backgroundColor:
+                      type === "Ready"
+                        ? colors.success
+                        : type === "History"
+                          ? colors.primary
+                          : colors.accent,
+                  },
+                ]}
+                onPress={() => setActiveTab(type)}
+              >
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    activeTab === type && { color: "white" },
+                  ]}
+                >
+                  {type === "Pending"
+                    ? "Navbat"
                     : type === "Ready"
                       ? "Tayyor"
-                      : "Ombor";
-              return (
-                <TouchableOpacity
-                  key={type}
+                      : "Tarix"}
+                </Text>
+                <View
                   style={[
-                    styles.tabItem,
-                    activeTab === type && {
-                      backgroundColor:
-                        type === "Ready"
-                          ? colors.success
-                          : type === "Cooking"
-                            ? colors.primary
-                            : type === "Inventory"
-                              ? colors.accent
-                              : colors.accent,
-                    },
+                    styles.tabBadge,
+                    { backgroundColor: "rgba(255,255,255,0.3)" },
                   ]}
-                  onPress={() => setActiveTab(type)}
                 >
                   <Text
                     style={[
-                      styles.tabLabel,
-                      activeTab === type && { color: "white" },
+                      styles.tabBadgeText,
+                      { color: activeTab === type ? "white" : colors.text },
                     ]}
                   >
-                    {label}
+                    {count}
                   </Text>
-                  <View
-                    style={[
-                      styles.tabBadge,
-                      activeTab === type
-                        ? { backgroundColor: "rgba(255,255,255,0.3)" }
-                        : { backgroundColor: "rgba(0,0,0,0.05)" },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.tabBadgeText,
-                        activeTab === type && { color: "white" },
-                      ]}
-                    >
-                      {count}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            },
-          )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {activeTab === "Inventory" ? (
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-          >
-            {pendingTransfers.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                  Yangi kelgan masalliqlar
-                </Text>
-                {pendingTransfers.map((t) => (
-                  <View
-                    key={t._id}
-                    style={[
-                      styles.transferCard,
-                      { backgroundColor: colors.card },
-                    ]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[styles.transferName, { color: colors.text }]}
-                      >
-                        {t.productId?.name || "Noma'lum mahsulot"}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: colors.secondary }}>
-                        Masalliq kelgan vaqti:{" "}
-                        {new Date(t.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.transferQtyBadge,
-                        { backgroundColor: colors.primary + "15" },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.transferQty,
-                          { color: colors.primary, fontWeight: "bold" },
-                        ]}
-                      >
-                        {t.quantity} {t.productId?.unit || ""}
-                      </Text>
-                    </View>
-                    <View style={styles.transferActions}>
-                      <TouchableOpacity
-                        onPress={() => handleConfirmTransfer(t._id, "REJECTED")}
-                        style={[
-                          styles.actionBtn,
-                          { backgroundColor: colors.danger + "15" },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="close"
-                          size={20}
-                          color={colors.danger}
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleConfirmTransfer(t._id, "ACCEPTED")}
-                        style={[
-                          styles.actionBtn,
-                          { backgroundColor: colors.success + "15" },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="check"
-                          size={20}
-                          color={colors.success}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <View style={styles.section}>
-              <View
-                style={[
-                  styles.searchBar,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="magnify"
-                  size={20}
-                  color={colors.secondary}
-                />
-                <TextInput
-                  style={[styles.searchInput, { color: colors.text }]}
-                  placeholder="Mahsulotlarni qidirish..."
-                  placeholderTextColor={colors.secondary}
-                  value={inventorySearch}
-                  onChangeText={setInventorySearch}
-                />
-                {inventorySearch !== "" && (
-                  <TouchableOpacity onPress={() => setInventorySearch("")}>
-                    <MaterialCommunityIcons
-                      name="close-circle"
-                      size={20}
-                      color={colors.secondary}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                  Mavjud qoldiq
-                </Text>
-                <View
-                  style={[
-                    styles.stockInfoBadge,
-                    { backgroundColor: colors.accent + "15" },
-                  ]}
-                >
-                  <Text
-                    style={{
-                      color: colors.accent,
-                      fontWeight: "bold",
-                      fontSize: 12,
-                    }}
-                  >
-                    {
-                      myStock.filter((s) =>
-                        s.productId?.name
-                          ?.toLowerCase()
-                          .includes(inventorySearch.toLowerCase()),
-                      ).length
-                    }{" "}
-                    tur
-                  </Text>
-                </View>
-              </View>
-
-              {myStock.filter((s) =>
-                s.productId?.name
-                  ?.toLowerCase()
-                  .includes(inventorySearch.toLowerCase()),
-              ).length === 0 ? (
-                <View
-                  style={[styles.emptyCard, { backgroundColor: colors.card }]}
-                >
-                  <MaterialCommunityIcons
-                    name="package-variant"
-                    size={48}
-                    color={colors.secondary + "30"}
-                  />
-                  <Text
-                    style={{
-                      color: colors.secondary,
-                      fontStyle: "italic",
-                      marginTop: 10,
-                    }}
-                  >
-                    {inventorySearch === ""
-                      ? "Hozircha omborda mahsulot yo'q"
-                      : "Qidiruv bo'yicha mahsulot topilmadi"}
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.stockGrid}>
-                  {myStock
-                    .filter((s) =>
-                      s.productId?.name
-                        ?.toLowerCase()
-                        .includes(inventorySearch.toLowerCase()),
-                    )
-                    .map((s) => {
-                      const minThreshold = s.productId?.minThreshold || 0;
-                      const isLow = s.quantity < minThreshold;
-                      return (
-                        <View
-                          key={s._id}
-                          style={[
-                            styles.stockGridItem,
-                            {
-                              backgroundColor: colors.card,
-                              borderColor: isLow
-                                ? colors.danger + "30"
-                                : colors.border + "50",
-                            },
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.stockIconBox,
-                              {
-                                backgroundColor: isLow
-                                  ? colors.danger + "10"
-                                  : colors.primary + "05",
-                              },
-                            ]}
-                          >
-                            <MaterialCommunityIcons
-                              name={
-                                isLow
-                                  ? "alert-circle-outline"
-                                  : "package-variant-closed"
-                              }
-                              size={20}
-                              color={isLow ? colors.danger : colors.primary}
-                            />
-                          </View>
-                          <Text
-                            style={[
-                              styles.stockGridName,
-                              { color: colors.text },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {s.productId?.name}
-                          </Text>
-                          <View style={styles.stockGridFooter}>
-                            <Text
-                              style={[
-                                styles.stockGridQty,
-                                { color: isLow ? colors.danger : colors.text },
-                              ]}
-                            >
-                              {Number(s.quantity).toLocaleString(undefined, {
-                                maximumFractionDigits: 3,
-                              })}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.stockGridUnit,
-                                { color: colors.secondary },
-                              ]}
-                            >
-                              {s.productId?.unit}
-                            </Text>
-                          </View>
-                          {isLow && (
-                            <View
-                              style={[
-                                styles.lowStockTag,
-                                { backgroundColor: colors.danger },
-                              ]}
-                            >
-                              <Text style={styles.lowStockText}>KAM</Text>
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })}
-                </View>
-              )}
-            </View>
-          </ScrollView>
-        ) : loading ? (
+        {loading ? (
           <ActivityIndicator
             size="large"
             color={colors.primary}
@@ -1124,7 +640,48 @@ export default function KitchenScreen() {
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
           >
-            {filteredItems.length === 0 ? (
+            {activeTab === "History" ? (
+              shifts.length === 0 ? (
+                <View style={styles.empty}>
+                  <MaterialCommunityIcons
+                    name="clipboard-text-outline"
+                    size={64}
+                    color={colors.secondary + "40"}
+                  />
+                  <Text style={[styles.emptyText, { color: colors.secondary }]}>
+                    Smenalar yo'q
+                  </Text>
+                </View>
+              ) : (
+                shifts.map((shift, idx) => (
+                  <TouchableOpacity
+                    key={shift._id || idx}
+                    style={[styles.itemCard, { backgroundColor: colors.card, padding: 16 }]}
+                    onPress={() => handleViewShiftDetails(shift)}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary + "20", justifyContent: "center", alignItems: "center", marginRight: 12 }}>
+                        <MaterialCommunityIcons name="calendar-clock" size={24} color={colors.primary} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.text, fontSize: 16, fontWeight: "600" }}>
+                          {new Date(shift.startTime).toLocaleDateString("uz-UZ")}
+                        </Text>
+                        <Text style={{ color: colors.secondary, fontSize: 13, marginTop: 4 }}>
+                          Boshlandi: {new Date(shift.startTime).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
+                        </Text>
+                        {shift.endTime && (
+                          <Text style={{ color: colors.secondary, fontSize: 13, marginTop: 2 }}>
+                            Yakunlandi: {new Date(shift.endTime).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
+                          </Text>
+                        )}
+                      </View>
+                      <MaterialCommunityIcons name="chevron-right" size={24} color={colors.secondary} />
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )
+            ) : filteredItems.length === 0 ? (
               <View style={styles.empty}>
                 <MaterialCommunityIcons
                   name="clipboard-text-outline"
@@ -1132,100 +689,158 @@ export default function KitchenScreen() {
                   color={colors.secondary + "40"}
                 />
                 <Text style={[styles.emptyText, { color: colors.secondary }]}>
-                  Hozircha malumot yo&apos;q
+                  Hozircha malumot yo'q
                 </Text>
               </View>
             ) : (
-              filteredItems.map((order) => (
+              filteredItems.map((order: any) => (
                 <SwipeableItem
                   key={order._id}
                   item={order}
                   colors={colors}
-                  onSwipeRight={handleSwipeRight}
-                  onSwipeLeft={handleSwipeLeft}
-                  onPress={() => {}} // Optional detail view
+                  onSwipeRight={(id, items) =>
+                    updateItemsStatus(
+                      id,
+                      items.map((i) => i.index),
+                      "Ready",
+                    )
+                  }
+                  onSwipeLeft={(id, items) =>
+                    updateItemsStatus(
+                      id,
+                      items.map((i) => i.index),
+                      "Pending",
+                    )
+                  }
+                  onPress={() => {}}
                 />
               ))
             )}
           </ScrollView>
         )}
       </SafeAreaView>
+
+      {/* Shift Details Modal */}
+      <Modal visible={shiftDetailsModal} transparent animationType="slide" statusBarTranslucent>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop} 
+            activeOpacity={1} 
+            onPress={() => setShiftDetailsModal(false)} 
+          />
+          <View style={[styles.bottomSheet, { backgroundColor: colors.background, flex: 0.92 }]}>
+            <View style={styles.sheetHandleContainer}>
+              <View style={styles.sheetHandle} />
+            </View>
+            <View style={[styles.modalContent, { flex: 1, paddingBottom: 20 }]}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity
+                  onPress={() => setShiftDetailsModal(false)}
+                  style={styles.modalCloseBtn}
+                >
+                  <MaterialCommunityIcons
+                    name="arrow-left"
+                    size={26}
+                    color={colors.text}
+                  />
+                </TouchableOpacity>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  Smena Buyurtmalari
+                </Text>
+                <View style={{ width: 40 }} />
+              </View>
+
+              {loadingShift ? (
+                <View style={styles.centered}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                </View>
+              ) : (
+                <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+                  {shiftOrders.length === 0 ? (
+                    <Text style={[styles.emptyText, { color: colors.secondary, textAlign: 'center', marginTop: 40 }]}>Bu smenada stansiya uchun tayyorlangan buyurtmalar yo'q</Text>
+                  ) : (
+                    shiftOrders.map((order: any, idx) => {
+                      return (
+                        <View key={order._id || idx} style={[styles.itemCard, { backgroundColor: colors.card, marginBottom: 12 }]}>
+                          <View style={styles.itemHeader}>
+                            <View style={[styles.tableBadge, { backgroundColor: colors.primary + "15" }]}>
+                              <Text style={[styles.tableName, { color: colors.primary }]}>
+                                Stol {order.tableName}
+                              </Text>
+                            </View>
+                            <View style={styles.orderIdBadge}>
+                              <Text style={[styles.orderIdText, { color: colors.secondary }]}>
+                                {new Date(order.createdAt).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.itemBodyList}>
+                            {order.items.map((bi: any, bIndex: number) => (
+                              <View key={bIndex} style={styles.itemBodyRow}>
+                                <Text style={[styles.itemQty, { color: colors.primary }]}>
+                                  {bi.quantity}x
+                                </Text>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={[styles.itemName, { color: colors.text }]}>
+                                    {bi.name}
+                                  </Text>
+                                  {bi.completedBy && (
+                                    <Text style={{ color: colors.success, fontSize: 11, fontWeight: "500", marginTop: 2 }}>
+                                      ✅ {bi.completedBy} tomonidan tayyorlandi
+                                    </Text>
+                                  )}
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  swipeContainer: {
-    position: "relative",
-    marginBottom: 12,
-  },
-  swipeBack: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: "100%",
-    borderRadius: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingLeft: 25,
-  },
-  swipeBackRight: {
-    justifyContent: "flex-end",
-    paddingLeft: 0,
-    paddingRight: 25,
-  },
   headerCard: {
     margin: 20,
-    padding: 24,
-    borderRadius: 30,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    padding: 20,
+    borderRadius: 25,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
   },
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    height: 54,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  searchInput: { flex: 1, marginLeft: 12, fontSize: 16, fontWeight: "500" },
-  headerInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
+  headerInfo: { flexDirection: "row", alignItems: "center", gap: 12 },
   headerIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 15,
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
   },
   headerRole: {
-    fontSize: 14,
+    fontSize: 12,
     color: "rgba(255,255,255,0.8)",
     fontWeight: "bold",
     letterSpacing: 1,
-    textTransform: "uppercase",
   },
-  headerTitle: {
-    fontSize: 24,
-    color: "white",
-    fontWeight: "bold",
-    marginTop: 2,
-  },
+  headerTitle: { fontSize: 20, color: "white", fontWeight: "bold" },
   logoutBtn: { padding: 8 },
   tabsContainer: {
     flexDirection: "row",
@@ -1238,22 +853,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 8,
     paddingVertical: 12,
     borderRadius: 15,
     backgroundColor: "rgba(0,0,0,0.03)",
   },
-  tabLabel: { fontSize: 13, fontWeight: "bold", color: "#64748B" },
-  tabBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  tabBadgeText: { fontSize: 11, fontWeight: "bold", color: "#64748B" },
-  scrollContent: { padding: 20 },
+  tabLabel: { fontSize: 14, fontWeight: "bold", color: "#64748B" },
+  tabBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  tabBadgeText: { fontSize: 12, fontWeight: "bold" },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   itemCard: {
     borderRadius: 20,
     padding: 16,
+    marginBottom: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -1264,14 +876,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 15,
   },
-  tableBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  tableName: { fontSize: 14, fontWeight: "bold" },
+  tableBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  tableName: { fontSize: 16, fontWeight: "bold" },
   orderIdBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1279,31 +887,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.05)",
   },
-  orderIdText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    fontFamily: "monospace",
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusText: { fontSize: 12, fontWeight: "bold" },
-  itemBodyList: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  itemBodyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  itemQty: { fontSize: 20, fontWeight: "bold" },
-  itemName: { fontSize: 18, fontWeight: "500" },
+  orderIdText: { fontSize: 12, fontWeight: "bold", fontFamily: "monospace" },
+  itemBodyList: { gap: 10, marginBottom: 15 },
+  itemBodyRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  itemQty: { fontSize: 18, fontWeight: "bold" },
+  itemName: { fontSize: 16, fontWeight: "600" },
   itemFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1312,145 +900,33 @@ const styles = StyleSheet.create({
     borderTopColor: "rgba(0,0,0,0.05)",
     paddingTop: 12,
   },
-  timeText: { fontSize: 12, fontWeight: "500" },
-  footerInfo: {
+  timeText: { fontSize: 13, fontWeight: "500" },
+  footerInfo: { flexDirection: "row", alignItems: "center", gap: 8 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  statusText: { fontSize: 12, fontWeight: "bold" },
+  swipeContainer: { position: "relative", marginBottom: 12 },
+  swipeBack: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 20,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    paddingLeft: 20,
   },
-  infoBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  infoText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  infoSeparator: {
-    width: 1,
-    height: 12,
-    backgroundColor: "rgba(0,0,0,0.1)",
-  },
-  itemFooterRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
+  swipeBackRight: { justifyContent: "flex-end", paddingRight: 20 },
   empty: { alignItems: "center", marginTop: 100 },
   emptyText: { fontSize: 16, marginTop: 15, fontWeight: "500" },
-  section: { marginBottom: 25 },
-  sectionTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 15 },
-  transferCard: {
-    borderRadius: 15,
-    padding: 15,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  transferInfo: { flex: 1, gap: 4 },
-  transferName: { fontSize: 16, fontWeight: "bold" },
-  transferQtyBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginLeft: 10,
-  },
-  transferQty: { fontSize: 14, fontWeight: "600" },
-  transferActions: { flexDirection: "row", gap: 8 },
-  actionBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  stockList: { borderRadius: 15, overflow: "hidden" },
-  stockRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 15,
-  },
-  stockName: { fontSize: 16, fontWeight: "500" },
-  stockQty: { fontSize: 16, fontWeight: "bold" },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 15,
-  },
-  stockInfoBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  emptyCard: {
-    padding: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "rgba(0,0,0,0.1)",
-  },
-  stockGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  stockGridItem: {
-    width: (SCREEN_WIDTH - 52) / 2,
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    position: "relative",
-    overflow: "hidden",
-  },
-  stockIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  stockGridName: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  stockGridFooter: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 4,
-  },
-  stockGridQty: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  stockGridUnit: {
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  lowStockTag: {
-    position: "absolute",
-    top: 10,
-    right: -15,
-    paddingHorizontal: 20,
-    paddingVertical: 2,
-    transform: [{ rotate: "45deg" }],
-  },
-  lowStockText: {
-    color: "white",
-    fontSize: 8,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject },
+  bottomSheet: { borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: "hidden" },
+  sheetHandleContainer: { alignItems: "center", paddingVertical: 10 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "rgba(0,0,0,0.1)" },
+  modalContent: { padding: 20 },
+  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
+  modalCloseBtn: { padding: 5 },
+  modalTitle: { fontSize: 18, fontWeight: "bold" },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
 });

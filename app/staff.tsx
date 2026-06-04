@@ -45,9 +45,7 @@ export default function StaffManagementScreen() {
       const response = await axios.get(`${API_BASE_URL}/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Filter out owners from the list
-      const nonOwners = response.data.filter((u: any) => u.role !== "owner");
-      setStaff(nonOwners);
+      setStaff(response.data);
     } catch (error) {
       console.error("Fetch staff error:", error);
       Alert.alert("Xato", "Xodimlarni yuklashda xatolik yuz berdi");
@@ -145,31 +143,41 @@ export default function StaffManagementScreen() {
               />
             )}
           </View>
-          <View
-            style={[
-              styles.roleBadge,
-              { backgroundColor: colors.accent + "15" },
-            ]}
-          >
-            <Text
-              style={[styles.roleText, { color: colors.accent }]}
-              numberOfLines={1}
-            >
-              {item.role === "ofisiant"
-                ? Translations.uz.auth.waiter
-                : item.role === "kassier"
-                  ? "Kassir"
-                  : item.role === "oshpaz"
-                    ? "Oshpaz"
-                    : item.role === "shashlikchi"
-                      ? "Shashlikchi"
-                      : item.role === "salatchi"
-                        ? "Salatchi"
-                        : item.role === "bar"
-                          ? "Barman"
-                          : item.role.charAt(0).toUpperCase() +
-                            item.role.slice(1)}
-            </Text>
+          <View style={styles.roleContainer}>
+            {[item.role, ...(item.extraRoles || [])].map((role, idx) => (
+              <View
+                key={`${item._id}-role-${idx}`}
+                style={[
+                  styles.roleBadge,
+                  {
+                    backgroundColor:
+                      idx === 0 ? colors.accent + "15" : colors.primary + "15",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.roleText,
+                    { color: idx === 0 ? colors.accent : colors.primary },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {role === "ofisiant"
+                    ? Translations.uz.auth.waiter
+                    : role === "kassier"
+                      ? "Kassir"
+                      : role === "oshpaz"
+                        ? "Oshpaz"
+                        : role === "shashlikchi"
+                          ? "Shashlikchi"
+                          : role === "salatchi"
+                            ? "Salatchi"
+                            : role === "bar"
+                              ? "Barman"
+                              : role.charAt(0).toUpperCase() + role.slice(1)}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
         <View
@@ -228,6 +236,7 @@ export default function StaffManagementScreen() {
                 fullName: item.fullName,
                 phone: item.phone,
                 role: item.role,
+                extraRoles: item.extraRoles?.join(","),
               },
             })
           }
@@ -583,6 +592,11 @@ const styles = StyleSheet.create({
   staffName: {
     fontSize: 18,
     fontWeight: "bold",
+  },
+  roleContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
   },
   roleBadge: {
     paddingHorizontal: 8,
