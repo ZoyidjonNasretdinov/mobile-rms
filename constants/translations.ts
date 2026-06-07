@@ -136,7 +136,7 @@ export const Translations = {
       warehouseSummary: "Ombor xulosasi",
       netProfit: "Sof foyda",
       softProfit: "Taxminiy foyda",
-      topSold: "Eng ko'p sotilgan",
+      topSold: "Barcha sotilgan mahsulotlar",
       leastSold: "Eng kam sotilgan",
       expectedUsage: "Kutilayotgan sarf",
       actualOutput: "Amaldagi chiqim",

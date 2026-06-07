@@ -80,8 +80,10 @@ export default function CreateProcurementScreen() {
     unit: "ta",
     category: "",
     supplier: "",
-    source: "cashier",
+    source: "direktor1",
   });
+  
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const handleQuantityChange = (val: string) => {
     const q = parseFloat(val);
@@ -113,10 +115,6 @@ export default function CreateProcurementScreen() {
     setForm({ ...form, totalPrice: val, unitPrice: u });
   };
 
-  const sources = [
-    { label: "Kassa", value: "cashier" },
-    { label: "Direktor", value: "owner" },
-  ];
 
   // const units = ["kg", "litr", "ta", "bog'", "blok", "metr"];
 
@@ -131,10 +129,27 @@ export default function CreateProcurementScreen() {
         setCategories(catRes.data);
       } catch (error: any) {
         console.error("Fetch data error:", error);
-        // silent fail - foydalanuvchi o'zgartirishni saqlaganda xato ko'radi
+        // silent fail
       }
     };
+    
+    const fetchUser = async () => {
+      const userStr = await Storage.getItem("user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setCurrentUser(user);
+        
+        // Auto-select based on user name or role
+        if (user.fullName?.toLowerCase().includes("2") || user.fullName?.toLowerCase().includes("ikkinchi")) {
+          setForm(prev => ({ ...prev, source: "direktor2" }));
+        } else {
+          setForm(prev => ({ ...prev, source: "direktor1" }));
+        }
+      }
+    };
+
     fetchData();
+    fetchUser();
   }, []);
 
   const handleSave = async () => {
@@ -161,7 +176,6 @@ export default function CreateProcurementScreen() {
         quantity: parsedQty,
         unit: form.unit,
         category: form.category,
-        supplier: form.supplier,
         source: form.source,
         price: parsedTotalPrice,
       });
@@ -447,61 +461,6 @@ export default function CreateProcurementScreen() {
               </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>
-                {"To'lov manbasi"}
-              </Text>
-              <View style={styles.chipGrid}>
-                {sources.map((s) => (
-                  <TouchableOpacity
-                    key={s.value}
-                    onPress={() => setForm({ ...form, source: s.value })}
-                    style={[
-                      styles.sourceChip,
-                      {
-                        backgroundColor:
-                          form.source === s.value
-                            ? colors.secondary
-                            : colors.card,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={{
-                        color: form.source === s.value ? "white" : colors.text,
-                      }}
-                    >
-                      {s.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.secondary }]}>
-                Yetkazib beruvchi / Joy
-              </Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="map-marker-outline"
-                  size={20}
-                  color={colors.secondary}
-                />
-                <TextInput
-                  style={[styles.input, { color: colors.text, marginLeft: 8 }]}
-                  placeholder="Masalan: Chorsu bozori"
-                  placeholderTextColor={colors.secondary}
-                  value={form.supplier}
-                  onChangeText={(val) => setForm({ ...form, supplier: val })}
-                />
-              </View>
-            </View>
           </View>
         </ScrollView>
 

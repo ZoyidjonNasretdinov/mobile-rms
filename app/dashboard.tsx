@@ -63,7 +63,10 @@ export default function DashboardScreen() {
 
       try {
         const token = await Storage.getItem("access_token");
-        const headers = { Authorization: `Bearer ${token}` };
+        const headers = { 
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache"
+        };
         
         let isOwner = false;
         if (userStr) {
@@ -121,6 +124,7 @@ export default function DashboardScreen() {
 
     socket.on("orderCreated", handleUpdate);
     socket.on("orderUpdated", handleUpdate);
+    socket.on("orderPaid", handleUpdate);
     socket.on("staffStatusChanged", handleUpdate);
     socket.on("stockUpdated", handleUpdate);
     socket.on("staffStockUpdated", handleUpdate);
@@ -129,6 +133,7 @@ export default function DashboardScreen() {
     return () => {
       socket.off("orderCreated", handleUpdate);
       socket.off("orderUpdated", handleUpdate);
+      socket.off("orderPaid", handleUpdate);
       socket.off("staffStatusChanged", handleUpdate);
       socket.off("stockUpdated", handleUpdate);
       socket.off("staffStockUpdated", handleUpdate);
@@ -281,6 +286,8 @@ export default function DashboardScreen() {
         cash: res.data.stats.expectedCash,
         card: res.data.stats.expectedCard,
       });
+      setShiftCash("");
+      setShiftCard("");
     } catch (e) {
       console.error("Error fetching expected totals", e);
     }
@@ -703,8 +710,10 @@ export default function DashboardScreen() {
                       styles.discrepancyValue,
                       {
                         color:
-                          parseFloat(shiftCash) - expectedTotals.cash === 0
+                          (parseFloat(shiftCash || "0") - expectedTotals.cash) === 0
                             ? colors.success
+                            : (parseFloat(shiftCash || "0") - expectedTotals.cash) > 0
+                            ? colors.warning
                             : colors.danger,
                       },
                     ]}
@@ -774,8 +783,10 @@ export default function DashboardScreen() {
                       styles.discrepancyValue,
                       {
                         color:
-                          parseFloat(shiftCard) - expectedTotals.card === 0
+                          (parseFloat(shiftCard || "0") - expectedTotals.card) === 0
                             ? colors.success
+                            : (parseFloat(shiftCard || "0") - expectedTotals.card) > 0
+                            ? colors.warning
                             : colors.danger,
                       },
                     ]}
@@ -980,20 +991,64 @@ export default function DashboardScreen() {
                   </View>
                   <View style={styles.reportRow}>
                     <Text style={[styles.reportText, { color: colors.text }]}>
-                      Farq (Discrepancy):
+                      Naqd farqi:
                     </Text>
                     <Text
                       style={[
                         styles.reportValue,
                         {
                           color:
-                            eodReport.stats.discrepancy < 0
-                              ? colors.danger
-                              : colors.success,
+                            eodReport.stats.discrepancyCash === 0
+                              ? colors.success
+                              : eodReport.stats.discrepancyCash > 0
+                              ? colors.warning
+                              : colors.danger,
                         },
                       ]}
                     >
-                      {eodReport.stats.discrepancy.toLocaleString()}{" "}
+                      {eodReport.stats.discrepancyCash.toLocaleString()}{" "}
+                      {Translations.uz.common.currency}
+                    </Text>
+                  </View>
+
+                  <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
+
+                  <View style={styles.reportRow}>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      Kutilgan Karta:
+                    </Text>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      {eodReport.stats.expectedCard.toLocaleString()}{" "}
+                      {Translations.uz.common.currency}
+                    </Text>
+                  </View>
+                  <View style={styles.reportRow}>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      Haqiqiy Karta:
+                    </Text>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      {eodReport.stats.actualCard.toLocaleString()}{" "}
+                      {Translations.uz.common.currency}
+                    </Text>
+                  </View>
+                  <View style={styles.reportRow}>
+                    <Text style={[styles.reportText, { color: colors.text }]}>
+                      Karta farqi:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.reportValue,
+                        {
+                          color:
+                            eodReport.stats.discrepancyCard === 0
+                              ? colors.success
+                              : eodReport.stats.discrepancyCard > 0
+                              ? colors.warning
+                              : colors.danger,
+                        },
+                      ]}
+                    >
+                      {eodReport.stats.discrepancyCard.toLocaleString()}{" "}
                       {Translations.uz.common.currency}
                     </Text>
                   </View>

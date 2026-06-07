@@ -75,7 +75,7 @@ export default function CreateOrderScreen() {
         }
 
         // If editing an existing order, load its items
-        if (orderId) {
+        if (orderId && orderId !== "undefined" && orderId !== "null") {
           const orderRes = await axios.get(
             `${API_BASE_URL}/orders/${orderId}`,
             {
@@ -161,12 +161,9 @@ export default function CreateOrderScreen() {
         (cart[item._id]?.quantity || 0) +
         (cart[`${item._id}-Pending`]?.quantity || 0);
 
-      if (currentInCart + delta > maxPossible) {
-        Alert.alert(
-          "Cheklov",
-          `Mini omborxonada ushbu mahsulotdan ko'pi bilan ${maxPossible} ta tayyorlash mumkin.`,
-        );
-        return;
+      if (currentInCart + delta > maxPossible && maxPossible !== undefined && maxPossible !== 1000) {
+        // Just a warning, don't block
+        // console.warn(`Stock low: ${maxPossible} available`);
       }
       // Adding: Always target a "Pending" entry
       const pendingKey = item._id;
@@ -280,7 +277,7 @@ export default function CreateOrderScreen() {
   const filteredItems = items.filter(
     (item) =>
       (selectedCategory ? item.categoryId?._id === selectedCategory : true) &&
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      (item.name || "").toLowerCase().includes((searchQuery || "").toLowerCase()),
   );
 
   if (loading) {
@@ -448,9 +445,16 @@ export default function CreateOrderScreen() {
                     {item.name}
                   </Text>
                   {isUnavailable ? (
-                    <Text style={styles.outOfStockLabel}>
-                      Yetarli mahsulot yo'q
-                    </Text>
+                    <View>
+                      <Text
+                        style={[styles.itemPrice, { color: colors.primary }]}
+                      >
+                        {item.price?.toLocaleString()} sūm
+                      </Text>
+                      <Text style={styles.outOfStockLabel}>
+                        (Omborda yetarli emas)
+                      </Text>
+                    </View>
                   ) : (
                     <View>
                       <Text
@@ -503,9 +507,7 @@ export default function CreateOrderScreen() {
                     </>
                   ) : null}
 
-                  {(!cart[item._id] ||
-                    cart[item._id].quantity < (itemAvail?.maxQuantity || 0)) &&
-                    !isUnavailable && (
+                  {(!cart[item._id]) && (
                       <TouchableOpacity
                         onPress={() => updateQuantity(item, 1)}
                         style={[
@@ -523,17 +525,22 @@ export default function CreateOrderScreen() {
                       </TouchableOpacity>
                     )}
 
-                  {cart[item._id]?.quantity >= (itemAvail?.maxQuantity || 0) &&
-                    !isUnavailable && (
-                      <View
-                        style={[styles.qtyBtn, { backgroundColor: "#F1F5F9" }]}
+                  {cart[item._id]?.quantity > 0 && (
+                      <TouchableOpacity
+                        onPress={() => updateQuantity(item, 1)}
+                        style={[
+                          styles.qtyBtn,
+                          {
+                            backgroundColor: colors.primary,
+                          },
+                        ]}
                       >
                         <MaterialCommunityIcons
-                          name="lock"
-                          size={16}
-                          color="#94A3B8"
+                          name="plus"
+                          size={18}
+                          color="white"
                         />
-                      </View>
+                      </TouchableOpacity>
                     )}
                 </View>
               </View>

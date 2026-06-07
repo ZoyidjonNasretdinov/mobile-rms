@@ -43,6 +43,8 @@ export default function InventoryStatusScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState(common.all);
   const [activeView, setActiveView] = useState<"status" | "history">("status");
+  const [activeShift, setActiveShift] = useState<any>(null);
+  const [expandedHistoryDept, setExpandedHistoryDept] = useState<string | null>(null);
 
   // Distribution Modal State
   const [distributeModal, setDistributeModal] = useState(false);
@@ -57,7 +59,7 @@ export default function InventoryStatusScreen() {
   const [deptDetailsModal, setDeptDetailsModal] = useState(false);
   const [selectedDeptStats, setSelectedDeptStats] = useState<any>(null);
 
-  const departments = ["oshpaz", "salatchi", "shashlikchi", "bar", "ofisiant"];
+  const departments = ["oshpaz", "salatchi", "shashlikchi", "bar"];
 
   const formatTotalByUnit = (itemsArray: any[]) => {
     const totals: Record<string, number> = {};
@@ -90,13 +92,14 @@ export default function InventoryStatusScreen() {
       const token = await Storage.getItem("access_token");
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [itemsRes, catRes, statsRes, logsRes, staffStockRes] =
+      const [itemsRes, catRes, statsRes, logsRes, staffStockRes, shiftRes] =
         await Promise.all([
           axios.get(`${API_BASE_URL}/inventory/products`, { headers }),
           axios.get(`${API_BASE_URL}/inventory/categories`, { headers }),
           axios.get(`${API_BASE_URL}/inventory/department-stats`, { headers }),
           axios.get(`${API_BASE_URL}/inventory/logs?limit=50`, { headers }),
           axios.get(`${API_BASE_URL}/inventory/all-staff-stock`, { headers }),
+          axios.get(`${API_BASE_URL}/shifts/active`, { headers }).catch(() => ({ data: null })),
         ]);
 
       setItems(itemsRes.data);
@@ -104,6 +107,7 @@ export default function InventoryStatusScreen() {
       setStats(statsRes.data);
       setRecentLogs(logsRes.data);
       setAllStaffStock(staffStockRes.data);
+      setActiveShift(shiftRes.data);
     } catch (error) {
       console.error("Fetch inventory error:", error);
       Alert.alert("Xato", "Ma'lumotlarni yuklashda xatolik yuz berdi");
@@ -354,11 +358,11 @@ export default function InventoryStatusScreen() {
               color="white"
             />
           </View>
-          <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
               {t.title}
             </Text>
-            <Text style={[styles.headerSubtitle, { color: colors.secondary }]}>
+            <Text style={[styles.headerSubtitle, { color: colors.secondary }]} numberOfLines={1}>
               Jami mahsulotlar: {items.length}
             </Text>
           </View>
@@ -763,6 +767,14 @@ export default function InventoryStatusScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
+          {activeShift && (
+            <View style={{ marginBottom: 15, padding: 12, backgroundColor: colors.primary + "15", borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <MaterialCommunityIcons name="clock-outline" size={20} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>
+                Bugungi Smena: {new Date(activeShift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - Hozirgacha
+              </Text>
+            </View>
+          )}
           {recentLogs.filter((log) => log.type === "OUT").length === 0 ? (
             <View style={styles.emptyContainer}>
               <MaterialCommunityIcons
@@ -775,65 +787,52 @@ export default function InventoryStatusScreen() {
               </Text>
             </View>
           ) : (
-            recentLogs
-              .filter((log) => log.type === "OUT")
-              .map((log) => (
-                <View
-                  key={log._id}
-                  style={[styles.logCard, { backgroundColor: colors.card }]}
+            Object.entries(
+              recentLogs
+                .filter((log) => log.type === "OUT")
+                .reduce((acc: any, log: any) => {
+                  const dept = (log.toUser || log.reason || "Noma'lum").toUpperCase();
+                  if (!acc[dept]) acc[dept] = [];
+                  acc[dept].push(log);
+                  return acc;
+                }, {})
+            ).map(([dept, logs]: [string, any]) => (
+              <View key={dept} style={[styles.logCard, { backgroundColor: colors.card, flexDirection: 'column', alignItems: 'stretch', padding: 0, overflow: 'hidden' }]}>
+                <TouchableOpacity 
+                  onPress={() => setExpandedHistoryDept(expandedHistoryDept === dept ? null : dept)}
+                  style={{ flexDirection: 'row', alignItems: 'center', padding: 15, justifyContent: 'space-between' }}
                 >
-                  <View
-                    style={[
-                      styles.logIcon,
-                      { backgroundColor: colors.accent + "15" },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="arrow-down-bold-outline"
-                      size={24}
-                      color={colors.accent}
-                    />
-                  </View>
-                  <View style={styles.logBody}>
-                    <View style={styles.logHeader}>
-                      <Text style={[styles.logProduct, { color: colors.text }]}>
-                        {log.productId?.name || "Noma'lum"}
-                      </Text>
-                      <Text style={[styles.logQty, { color: colors.accent }]}>
-                        -
-                        {log.quantity.toLocaleString(undefined, {
-                          maximumFractionDigits: 3,
-                        })}{" "}
-                        {log.productId?.unit}
-                      </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={[styles.logIcon, { backgroundColor: colors.primary + "15", width: 40, height: 40, borderRadius: 20 }]}>
+                      <MaterialCommunityIcons name="store" size={20} color={colors.primary} />
                     </View>
-                    <Text
-                      style={[styles.logReason, { color: colors.secondary }]}
-                      numberOfLines={1}
-                    >
-                      {log.reason || "Sabab ko'rsatilmagan"}
-                    </Text>
-                    <View style={styles.logFooter}>
-                      <Text style={[styles.logUser, { color: colors.primary }]}>
-                        <MaterialCommunityIcons
-                          name="account-group"
-                          size={12}
-                        />{" "}
-                        {log.fromUser || log.department || "Xodim"}
-                      </Text>
-                      <Text
-                        style={[styles.logTime, { color: colors.secondary }]}
-                      >
-                        {new Date(log.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}{" "}
-                        | {new Date(log.createdAt).toLocaleDateString()}
-                      </Text>
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>{dept} BO'LIMI</Text>
+                      <Text style={{ fontSize: 12, color: colors.secondary }}>{logs.length} ta mahsulot chiqimi</Text>
                     </View>
                   </View>
-                </View>
-              ))
+                  <MaterialCommunityIcons 
+                    name={expandedHistoryDept === dept ? "chevron-up" : "chevron-down"} 
+                    size={24} 
+                    color={colors.secondary} 
+                  />
+                </TouchableOpacity>
+                
+                {expandedHistoryDept === dept && (
+                  <View style={{ borderTopWidth: 1, borderTopColor: colors.border, padding: 15, gap: 10 }}>
+                    {logs.map((log: any) => (
+                      <View key={log._id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 5 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.text }}>{log.productId?.name}</Text>
+                          <Text style={{ fontSize: 11, color: colors.secondary }}>{new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                        </View>
+                        <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.danger }}>-{log.quantity} {log.productId?.unit}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ))
           )}
           <View style={styles.bottomSpace} />
         </ScrollView>

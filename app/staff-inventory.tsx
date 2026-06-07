@@ -113,6 +113,9 @@ export default function StaffInventoryScreen() {
   };
 
   const handleConfirmTransfer = async (transferId: string, status: string) => {
+    // Optimistic UI update to prevent double clicking and 400 error
+    setPendingTransfers(prev => prev.filter(t => t._id !== transferId));
+    
     try {
       const token = await Storage.getItem("access_token");
       await axios.post(
@@ -122,6 +125,8 @@ export default function StaffInventoryScreen() {
       );
       fetchInventory();
     } catch (error) {
+      // Revert if error occurs
+      fetchInventory();
       console.error("Confirm transfer error:", error);
     }
   };
@@ -149,19 +154,32 @@ export default function StaffInventoryScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <MaterialCommunityIcons
-            name="arrow-left"
-            size={28}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {paramDept
-            ? `${(paramDept as string).charAt(0).toUpperCase()}${(paramDept as string).slice(1)} Ombori`
-            : "Mini Omborxona"}
-        </Text>
-        <View style={{ width: 40 }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <MaterialCommunityIcons
+              name="arrow-left"
+              size={28}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+          <View style={[styles.titleIcon, { backgroundColor: colors.accent }]}>
+            <MaterialCommunityIcons
+              name="store-outline"
+              size={24}
+              color="white"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+              {paramDept
+                ? `${(paramDept as string).charAt(0).toUpperCase()}${(paramDept as string).slice(1)} Ombori`
+                : "Mini Omborxona"}
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: colors.secondary }]}>
+              {myStock.length} xil mahsulot
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* Global Tabs Removed */}
@@ -602,10 +620,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 20, fontWeight: "bold" },
+  backBtn: { padding: 4, marginRight: 10 },
+  titleIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  headerTitle: { fontSize: 22, fontWeight: "bold" },
+  headerSubtitle: { fontSize: 13, marginTop: 2, fontWeight: "500" },
   tabsContainer: {
     flexDirection: "row",
     paddingHorizontal: 20,

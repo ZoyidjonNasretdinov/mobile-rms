@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -34,7 +35,7 @@ export default function WaiterStationScreen() {
   const colors = Colors[colorScheme];
 
   const [activeTab, setActiveTab] = useState<
-    "tables" | "myOrders" | "notifications"
+    "tables" | "myOrders" | "notifications" | "history"
   >("tables");
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -42,6 +43,9 @@ export default function WaiterStationScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [tables, setTables] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [historyOrders, setHistoryOrders] = useState<any[]>([]);
+  const [selectedHistoryOrder, setSelectedHistoryOrder] = useState<any>(null);
+  const [expandedDates, setExpandedDates] = useState<string[]>([]);
   const [user, setUser] = useState<any>(null);
   const userRef = useRef<any>(null);
   const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
@@ -101,6 +105,27 @@ export default function WaiterStationScreen() {
       fetchData();
     }, [fetchData])
   );
+
+  useEffect(() => {
+    if (activeTab === "history") {
+      fetchHistoryOrders();
+    }
+  }, [activeTab]);
+
+  const fetchHistoryOrders = async () => {
+    try {
+      const token = await Storage.getItem("access_token");
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const res = await axios.get(`${API_BASE_URL}/orders?startDate=${thirtyDaysAgo.toISOString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setHistoryOrders(res.data);
+    } catch (error) {
+      console.error("Fetch history error:", error);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -656,33 +681,14 @@ export default function WaiterStationScreen() {
               color={colors.text}
             />
           </TouchableOpacity>
-          <View>
-            <Text style={[styles.headerSubtitle, { color: colors.secondary, marginBottom: 2 }]}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text style={[styles.headerSubtitle, { color: colors.secondary, marginBottom: 2 }]} numberOfLines={1}>
               {user?.fullName || "Waiter"}
             </Text>
-            <Text style={[styles.headerTitle, { color: colors.text, fontSize: 24, fontWeight: "800" }]}>
+            <Text style={[styles.headerTitle, { color: colors.text, fontSize: 24, fontWeight: "800" }]} numberOfLines={1}>
               {t.title}
             </Text>
           </View>
-        </View>
-        <View
-          style={[
-            styles.titleIcon,
-            {
-              backgroundColor: colors.accent,
-              width: 44,
-              height: 44,
-              borderRadius: 15,
-              justifyContent: "center",
-              alignItems: "center",
-            },
-          ]}
-        >
-          <MaterialCommunityIcons
-            name="shopping-outline"
-            size={24}
-            color="white"
-          />
         </View>
       </View>
 
@@ -721,7 +727,7 @@ export default function WaiterStationScreen() {
         />
         <StatBox
           label="Tushum"
-          value={`${orders
+          value={`${myOrders
             .reduce(
               (acc, o) => acc + (o.status === "Paid" ? o.totalAmount : 0),
               0,
@@ -735,7 +741,7 @@ export default function WaiterStationScreen() {
         <TouchableOpacity
           style={[
             styles.tabItem,
-            activeTab === "tables" && { backgroundColor: colors.primary },
+            activeTab === "tables" && { backgroundColor: colors.primary, flex: 2 },
           ]}
           onPress={() => setActiveTab("tables")}
         >
@@ -744,21 +750,15 @@ export default function WaiterStationScreen() {
             size={20}
             color={activeTab === "tables" ? "white" : colors.secondary}
           />
-          <Text
-            style={[
-              styles.tabText,
-              { color: activeTab === "tables" ? "white" : colors.secondary },
-            ]}
-          >
-            Stollar
-          </Text>
+          {activeTab === "tables" && (
+            <Text style={[styles.tabText, { color: "white" }]}>Stollar</Text>
+          )}
         </TouchableOpacity>
+        
         <TouchableOpacity
           style={[
             styles.tabItem,
-            activeTab === "notifications" && {
-              backgroundColor: colors.primary,
-            },
+            activeTab === "notifications" && { backgroundColor: colors.primary, flex: 2 },
           ]}
           onPress={() => {
             setActiveTab("notifications");
@@ -780,19 +780,30 @@ export default function WaiterStationScreen() {
               />
             )}
           </View>
-          <Text
-            style={[
-              styles.tabText,
-              {
-                color:
-                  activeTab === "notifications" ? "white" : colors.secondary,
-              },
-            ]}
-          >
-            Bildirishnomalar
-          </Text>
+          {activeTab === "notifications" && (
+            <Text style={[styles.tabText, { color: "white" }]}>Xabarlar</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tabItem,
+            activeTab === "history" && { backgroundColor: colors.primary, flex: 2 },
+          ]}
+          onPress={() => setActiveTab("history")}
+        >
+          <MaterialCommunityIcons
+            name="history"
+            size={20}
+            color={activeTab === "history" ? "white" : colors.secondary}
+          />
+          {activeTab === "history" && (
+            <Text style={[styles.tabText, { color: "white" }]}>Tarix</Text>
+          )}
         </TouchableOpacity>
       </View>
+
+
 
       {activeTab === "tables" && (
         <View style={styles.floorSelector}>
@@ -858,7 +869,7 @@ export default function WaiterStationScreen() {
                 ))
               )}
             </View>
-          ) : (
+          ) : activeTab === "notifications" ? (
             <View style={styles.myOrdersList}>
               {notifications.length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.secondary }]}>
@@ -908,10 +919,159 @@ export default function WaiterStationScreen() {
                 ))
               )}
             </View>
-          )}
+          ) : activeTab === "history" ? (
+            <View style={styles.myOrdersList}>
+              {historyOrders.length === 0 ? (
+                <Text style={[styles.emptyText, { color: colors.secondary }]}>
+                  Tarix mavjud emas
+                </Text>
+              ) : (
+                Object.entries(
+                  historyOrders.reduce((acc, order) => {
+                    const date = new Date(order.createdAt).toLocaleDateString("ru-RU");
+                    if (!acc[date]) acc[date] = { revenue: 0, orders: [] };
+                    if (order.status === "Paid") {
+                      acc[date].revenue += order.totalAmount || 0;
+                    }
+                    acc[date].orders.push(order);
+                    return acc;
+                  }, {} as Record<string, { revenue: number; orders: any[] }>)
+                ).map(([date, data]: any) => (
+                  <View
+                    key={date}
+                    style={{
+                      marginBottom: 15,
+                      backgroundColor: colors.card || "white",
+                      borderRadius: 15,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <TouchableOpacity
+                      style={{ padding: 15 }}
+                      onPress={() => {
+                        setExpandedDates((prev) =>
+                          prev.includes(date)
+                            ? prev.filter((d) => d !== date)
+                            : [...prev, date]
+                        );
+                      }}
+                    >
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                        <Text style={{ fontWeight: "bold", fontSize: 16, color: colors.text }}>
+                          Sana: {date}
+                        </Text>
+                        <MaterialCommunityIcons
+                          name={expandedDates.includes(date) ? "chevron-up" : "chevron-down"}
+                          size={24}
+                          color={colors.secondary}
+                        />
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          color: colors.success || "green",
+                          marginTop: 8,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        Kunlik Tushum: {data.revenue.toLocaleString()} UZS
+                      </Text>
+                    </TouchableOpacity>
+
+                    {expandedDates.includes(date) && (
+                      <View style={{ paddingHorizontal: 15, paddingBottom: 10 }}>
+                        {data.orders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((o: any, idx: number) => (
+                          <TouchableOpacity
+                            key={idx}
+                            onPress={() => setSelectedHistoryOrder(o)}
+                            style={{
+                              paddingVertical: 12,
+                              borderTopWidth: 1,
+                              borderTopColor: colors.border || "#eee",
+                            }}
+                          >
+                            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                                <MaterialCommunityIcons name="clock-outline" size={14} color={colors.secondary} />
+                                <Text style={{ fontSize: 13, color: colors.secondary }}>
+                                  {new Date(o.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </Text>
+                              </View>
+                              <Text style={{ fontWeight: "bold", color: colors.text }}>
+                                {(o.totalAmount || 0).toLocaleString()} UZS
+                              </Text>
+                            </View>
+                            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+                              <Text style={{ fontWeight: "600", color: colors.text }}>
+                                {o.tableName}-stol ({o.status})
+                              </Text>
+                              <Text style={{ fontSize: 12, color: colors.secondary }} numberOfLines={1}>
+                                {o.items?.length || 0} ta mahsulot
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                ))
+              )}
+            </View>
+          ) : null}
           <View style={styles.bottomSpace} />
         </ScrollView>
       )}
+
+      {/* History Order Details Modal */}
+      <Modal
+        visible={!!selectedHistoryOrder}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSelectedHistoryOrder(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {selectedHistoryOrder?.tableName}-stol
+                </Text>
+                <Text style={{ color: colors.secondary, fontSize: 13, marginTop: 2 }}>
+                  {selectedHistoryOrder && new Date(selectedHistoryOrder.createdAt).toLocaleString("ru-RU")}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setSelectedHistoryOrder(null)}>
+                <MaterialCommunityIcons name="close" size={24} color={colors.secondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ padding: 20 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 15 }}>
+                <Text style={{ color: colors.secondary, fontWeight: "600" }}>Holat:</Text>
+                <Text style={{ color: colors.primary, fontWeight: "bold" }}>{selectedHistoryOrder?.status}</Text>
+              </View>
+              <Text style={{ fontWeight: "bold", color: colors.text, marginBottom: 10 }}>Buyurtmalar:</Text>
+              {selectedHistoryOrder?.items?.map((item: any, i: number) => (
+                <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border || "#eee" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.text }}>{item.name}</Text>
+                    <Text style={{ color: colors.secondary, fontSize: 12 }}>{item.price?.toLocaleString()} UZS x {item.quantity}</Text>
+                  </View>
+                  <Text style={{ color: colors.text, fontWeight: "600" }}>
+                    {((item.price || 0) * (item.quantity || 1)).toLocaleString()} UZS
+                  </Text>
+                </View>
+              ))}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border || "#eee" }}>
+                <Text style={{ fontWeight: "bold", fontSize: 16, color: colors.text }}>Jami:</Text>
+                <Text style={{ fontWeight: "bold", fontSize: 18, color: colors.success || "green" }}>
+                  {selectedHistoryOrder?.totalAmount?.toLocaleString()} UZS
+                </Text>
+              </View>
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -952,9 +1112,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 4,
   },
   statValue: { fontSize: 22, fontWeight: "bold" },
-  statLabel: { fontSize: 12, fontWeight: "600" },
+  statLabel: { fontSize: 12, fontWeight: "600", textAlign: "center" },
   tabSwitcher: {
     flexDirection: "row",
     marginHorizontal: 20,
@@ -1095,4 +1256,23 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "white",
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalContent: {
+    borderRadius: 24,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    padding: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(0,0,0,0.05)",
+  },
+  modalTitle: { fontSize: 18, fontWeight: "bold" },
 });

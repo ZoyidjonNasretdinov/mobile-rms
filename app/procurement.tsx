@@ -8,6 +8,7 @@ import {
   TextInput,
   RefreshControl,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -33,6 +34,9 @@ export default function ProcurementScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState(common.all);
+  const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -70,7 +74,11 @@ export default function ProcurementScreen() {
   );
 
   const filteredPurchases = useMemo(() => {
+    const today = new Date().toDateString();
     return purchases.filter((p) => {
+      if (!showHistory) {
+         if (new Date(p.date).toDateString() !== today) return false;
+      }
       const matchesSearch = p.item
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
@@ -78,7 +86,7 @@ export default function ProcurementScreen() {
         activeCategory === common.all || p.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, activeCategory, purchases]);
+  }, [searchQuery, activeCategory, purchases, showHistory]);
 
   const totalToday = useMemo(() => {
     const today = new Date().toDateString();
@@ -87,62 +95,62 @@ export default function ProcurementScreen() {
       .reduce((sum, p) => sum + p.price, 0);
   }, [purchases]);
 
-  const PurchaseCard = ({
-    _id,
-    item,
-    supplier,
-    price,
-    category,
-    source,
-    date,
-    unit,
-    quantity,
-  }: any) => (
-    <View style={[styles.purchaseCard, { backgroundColor: colors.card }]}>
-      <View style={styles.purchaseHeader}>
-        <View
-          style={[
-            styles.categoryIcon,
-            { backgroundColor: colors.accent + "15" },
-          ]}
-        >
-          <MaterialCommunityIcons
-            name={
-              category === "meat"
-                ? "food-steak"
-                : category === "drinks"
-                  ? "bottle-wine"
-                  : category === "vegetables"
-                    ? "food-apple"
-                    : "shaker-outline"
-            }
-            size={20}
-            color={colors.accent}
-          />
-        </View>
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={[styles.itemName, { color: colors.text }]}>{item}</Text>
-          <Text style={[styles.supplierName, { color: colors.secondary }]}>
-            {quantity} {unit} • {supplier}
+  const PurchaseCard = (p: any) => {
+    const { _id, item, supplier, price, category, source, date, unit, quantity } = p;
+    return (
+      <TouchableOpacity 
+        style={[styles.purchaseCard, { backgroundColor: colors.card }]}
+        onPress={() => {
+          setSelectedPurchase(p);
+          setShowDetails(true);
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={styles.purchaseHeader}>
+          <View
+            style={[
+              styles.categoryIcon,
+              { backgroundColor: colors.accent + "15" },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={
+                category === "meat"
+                  ? "food-steak"
+                  : category === "drinks"
+                    ? "bottle-wine"
+                    : category === "vegetables"
+                      ? "food-apple"
+                      : "shaker-outline"
+              }
+              size={20}
+              color={colors.accent}
+            />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={[styles.itemName, { color: colors.text }]}>{item}</Text>
+            <Text style={[styles.supplierName, { color: colors.secondary }]}>
+              {quantity} {unit}{supplier ? ` • ${supplier}` : ""}
+            </Text>
+          </View>
+          <Text style={[styles.priceText, { color: colors.text }]}>
+            {price.toLocaleString()} {common.currency}
           </Text>
         </View>
-        <Text style={[styles.priceText, { color: colors.text }]}>
-          {price.toLocaleString()} {common.currency}
-        </Text>
-      </View>
-      <View style={styles.purchaseFooter}>
-        <View
-          style={[styles.sourceBadge, { backgroundColor: colors.background }]}
-        >
-          <Text style={[styles.sourceText, { color: colors.secondary }]}>
-            {t.paymentSource}:{" "}
-            {t.sources[source as keyof typeof t.sources] || source} •{" "}
-            {new Date(date).toLocaleDateString()}
-          </Text>
+        <View style={styles.purchaseFooter}>
+          <View
+            style={[styles.sourceBadge, { backgroundColor: colors.background }]}
+          >
+            <Text style={[styles.sourceText, { color: colors.secondary }]}>
+              {t.paymentSource}:{" "}
+              {t.sources[source as keyof typeof t.sources] || source} •{" "}
+              {new Date(date).toLocaleDateString()}
+            </Text>
+          </View>
         </View>
-      </View>
-    </View>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView
@@ -167,21 +175,35 @@ export default function ProcurementScreen() {
               color="white"
             />
           </View>
-          <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {t.title}
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text 
+              style={[styles.headerTitle, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {showHistory ? "Xaridlar tarixi" : t.title}
             </Text>
-            <Text style={[styles.headerSubtitle, { color: colors.secondary }]}>
+            <Text 
+              style={[styles.headerSubtitle, { color: colors.secondary }]}
+              numberOfLines={1}
+            >
               Bugun: {totalToday.toLocaleString()} {common.currency}
             </Text>
           </View>
         </View>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-          onPress={() => router.push("/create-procurement")}
-        >
-          <MaterialCommunityIcons name="plus" size={24} color="white" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: showHistory ? colors.primary : colors.card, borderWidth: showHistory ? 0 : 1, borderColor: colors.border }]}
+            onPress={() => setShowHistory(!showHistory)}
+          >
+            <MaterialCommunityIcons name="history" size={24} color={showHistory ? "white" : colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.push("/create-procurement")}
+          >
+            <MaterialCommunityIcons name="plus" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -276,6 +298,100 @@ export default function ProcurementScreen() {
         )}
         <View style={styles.bottomSpace} />
       </ScrollView>
+
+      {/* Details Modal */}
+      <Modal visible={showDetails} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Xarid tafsilotlari</Text>
+              <TouchableOpacity onPress={() => setShowDetails(false)} style={[styles.closeButton, { backgroundColor: colors.card }]}>
+                <MaterialCommunityIcons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedPurchase && (
+              <ScrollView contentContainerStyle={styles.modalScroll}>
+                <View style={[styles.detailHeaderCard, { backgroundColor: colors.card }]}>
+                  <View style={[styles.detailIcon, { backgroundColor: colors.primary + "15" }]}>
+                    <MaterialCommunityIcons name="cart" size={32} color={colors.primary} />
+                  </View>
+                  <Text style={[styles.detailItemName, { color: colors.text }]}>{selectedPurchase.item}</Text>
+                  <Text style={[styles.detailPrice, { color: colors.primary }]}>
+                    {selectedPurchase.price.toLocaleString()} UZS
+                  </Text>
+                </View>
+
+                <View style={styles.detailRowGroup}>
+                  <View style={styles.detailRow}>
+                    <MaterialCommunityIcons name="account" size={20} color={colors.secondary} style={styles.detailRowIcon} />
+                    <View>
+                      <Text style={[styles.detailLabel, { color: colors.secondary }]}>Sotib olgan (Manba)</Text>
+                      <Text style={[styles.detailValue, { color: colors.text }]}>
+                        {t.sources[selectedPurchase.source as keyof typeof t.sources] || selectedPurchase.source}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <MaterialCommunityIcons name="calendar" size={20} color={colors.secondary} style={styles.detailRowIcon} />
+                    <View>
+                      <Text style={[styles.detailLabel, { color: colors.secondary }]}>Sana va Vaqt</Text>
+                      <Text style={[styles.detailValue, { color: colors.text }]}>
+                        {new Date(selectedPurchase.date).toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <MaterialCommunityIcons name="tag" size={20} color={colors.secondary} style={styles.detailRowIcon} />
+                    <View>
+                      <Text style={[styles.detailLabel, { color: colors.secondary }]}>Kategoriya</Text>
+                      <Text style={[styles.detailValue, { color: colors.text }]}>
+                        {selectedPurchase.category}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <MaterialCommunityIcons name="scale" size={20} color={colors.secondary} style={styles.detailRowIcon} />
+                    <View>
+                      <Text style={[styles.detailLabel, { color: colors.secondary }]}>Miqdori</Text>
+                      <Text style={[styles.detailValue, { color: colors.text }]}>
+                        {selectedPurchase.quantity} {selectedPurchase.unit}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <MaterialCommunityIcons name="cash" size={20} color={colors.secondary} style={styles.detailRowIcon} />
+                    <View>
+                      <Text style={[styles.detailLabel, { color: colors.secondary }]}>Birlik narxi</Text>
+                      <Text style={[styles.detailValue, { color: colors.text }]}>
+                        {selectedPurchase.quantity > 0 
+                          ? (selectedPurchase.price / selectedPurchase.quantity).toLocaleString() 
+                          : "0"} UZS
+                      </Text>
+                    </View>
+                  </View>
+
+                  {selectedPurchase.supplier ? (
+                    <View style={styles.detailRow}>
+                      <MaterialCommunityIcons name="map-marker" size={20} color={colors.secondary} style={styles.detailRowIcon} />
+                      <View>
+                        <Text style={[styles.detailLabel, { color: colors.secondary }]}>Joy / Yetkazib beruvchi</Text>
+                        <Text style={[styles.detailValue, { color: colors.text }]}>
+                          {selectedPurchase.supplier}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -368,4 +484,79 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: "center", marginTop: 60, gap: 16 },
   emptyText: { fontSize: 16, fontWeight: "600" },
   bottomSpace: { height: 100 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    height: "80%",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 24,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+  },
+  closeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalScroll: {
+    paddingBottom: 40,
+  },
+  detailHeaderCard: {
+    alignItems: "center",
+    padding: 24,
+    borderRadius: 24,
+    marginBottom: 24,
+  },
+  detailIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  detailItemName: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  detailPrice: {
+    fontSize: 24,
+    fontWeight: "800",
+  },
+  detailRowGroup: {
+    gap: 20,
+    paddingHorizontal: 8,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  detailRowIcon: {
+    marginRight: 16,
+    width: 24,
+    textAlign: "center",
+  },
+  detailLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  detailValue: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });
