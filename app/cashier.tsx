@@ -398,41 +398,58 @@ export default function CashierScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.headerSubtitle, { color: colors.secondary }]}>
-            {activeTab === "pending" ? t.pendingPayments : t.paymentHistory}
-          </Text>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {t.title}
-          </Text>
-        </View>
-        <View style={styles.headerActions}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           <TouchableOpacity
             style={[
               styles.historyBtn,
-              { backgroundColor: colors.card, marginRight: 10 },
+              {
+                backgroundColor: colors.card,
+                width: 44,
+                height: 44,
+                borderRadius: 15,
+                justifyContent: "center",
+                alignItems: "center",
+              },
             ]}
-            onPress={() =>
-              setActiveTab(activeTab === "pending" ? "history" : "pending")
-            }
-          >
-            <MaterialCommunityIcons
-              name={activeTab === "pending" ? "history" : "clock-outline"}
-              size={24}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.historyBtn, { backgroundColor: colors.card }]}
             onPress={handleHeaderAction}
           >
             <MaterialCommunityIcons
               name={user?.role === "owner" ? "arrow-left" : "logout"}
               size={24}
-              color={colors.secondary}
+              color={colors.text}
             />
           </TouchableOpacity>
+          <View>
+            <Text style={[styles.headerSubtitle, { color: colors.secondary, marginBottom: 2 }]}>
+              {activeTab === "pending" ? t.pendingPayments : t.paymentHistory}
+            </Text>
+            <Text style={[styles.headerTitle, { color: colors.text, fontSize: 24, fontWeight: "800" }]}>
+              {t.title}
+            </Text>
+          </View>
         </View>
+        <TouchableOpacity
+          style={[
+            styles.historyBtn,
+            {
+              backgroundColor: colors.accent,
+              width: 44,
+              height: 44,
+              borderRadius: 15,
+              justifyContent: "center",
+              alignItems: "center",
+            },
+          ]}
+          onPress={() =>
+            setActiveTab(activeTab === "pending" ? "history" : "pending")
+          }
+        >
+          <MaterialCommunityIcons
+            name={activeTab === "pending" ? "history" : "clock-outline"}
+            size={24}
+            color="white"
+          />
+        </TouchableOpacity>
       </View>
 
       {activeTab === "pending" && (

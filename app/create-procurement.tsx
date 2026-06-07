@@ -76,11 +76,42 @@ export default function CreateProcurementScreen() {
     itemId: "",
     unitPrice: "",
     quantity: "",
+    totalPrice: "",
     unit: "ta",
     category: "",
     supplier: "",
     source: "cashier",
   });
+
+  const handleQuantityChange = (val: string) => {
+    const q = parseFloat(val);
+    const u = parseFloat(form.unitPrice);
+    let t = form.totalPrice;
+    if (!isNaN(q) && !isNaN(u)) {
+      t = (q * u).toString();
+    }
+    setForm({ ...form, quantity: val, totalPrice: t });
+  };
+
+  const handleUnitPriceChange = (val: string) => {
+    const u = parseFloat(val);
+    const q = parseFloat(form.quantity);
+    let t = form.totalPrice;
+    if (!isNaN(q) && !isNaN(u)) {
+      t = (q * u).toString();
+    }
+    setForm({ ...form, unitPrice: val, totalPrice: t });
+  };
+
+  const handleTotalPriceChange = (val: string) => {
+    const t = parseFloat(val);
+    const q = parseFloat(form.quantity);
+    let u = form.unitPrice;
+    if (!isNaN(t) && !isNaN(q) && q > 0) {
+      u = (t / q).toString();
+    }
+    setForm({ ...form, totalPrice: val, unitPrice: u });
+  };
 
   const sources = [
     { label: "Kassa", value: "cashier" },
@@ -115,12 +146,12 @@ export default function CreateProcurementScreen() {
     const parsedUnitPrice = parseFloat(form.unitPrice);
     const parsedQty = parseFloat(form.quantity);
 
-    if (isNaN(parsedUnitPrice) || isNaN(parsedQty)) {
-      Alert.alert("Xato", "Narxi va miqdori raqam bo'lishi kerak");
+    const parsedTotalPrice = parseFloat(form.totalPrice);
+    
+    if (isNaN(parsedUnitPrice) || isNaN(parsedQty) || isNaN(parsedTotalPrice)) {
+      Alert.alert("Xato", "Narxi va miqdori to'g'ri raqam bo'lishi kerak");
       return;
     }
-
-    const totalPrice = parsedUnitPrice * parsedQty;
 
     setLoading(true);
     try {
@@ -132,7 +163,7 @@ export default function CreateProcurementScreen() {
         category: form.category,
         supplier: form.supplier,
         source: form.source,
-        price: totalPrice,
+        price: parsedTotalPrice,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Muvaffaqiyat", "Xarid saqlandi");
@@ -150,12 +181,24 @@ export default function CreateProcurementScreen() {
 
   const selectInventoryItem = (item: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Auto-populate unit price from the item's costPerUnit
+    const newUnitPrice = item.costPerUnit ? item.costPerUnit.toString() : "";
+    const qty = parseFloat(form.quantity);
+    let newTotalPrice = form.totalPrice;
+    
+    if (newUnitPrice && !isNaN(qty) && qty > 0) {
+      newTotalPrice = (parseFloat(newUnitPrice) * qty).toString();
+    }
+    
     setForm({
       ...form,
       item: item.name,
       itemId: item._id,
       unit: item.unit,
       category: item.category,
+      unitPrice: newUnitPrice,
+      totalPrice: newTotalPrice,
     });
     setShowProductModal(false);
   };
@@ -167,16 +210,27 @@ export default function CreateProcurementScreen() {
         (i) => i.name.toLowerCase() === form.item.toLowerCase(),
       );
       if (match) {
+        // Auto-populate unit price
+        const newUnitPrice = match.costPerUnit ? match.costPerUnit.toString() : form.unitPrice;
+        const qty = parseFloat(form.quantity);
+        let newTotalPrice = form.totalPrice;
+        
+        if (newUnitPrice && !isNaN(qty) && qty > 0 && form.unitPrice === "") {
+          newTotalPrice = (parseFloat(newUnitPrice) * qty).toString();
+        }
+
         setForm((prev) => ({
           ...prev,
           itemId: match._id,
           unit: match.unit,
           category: match.category,
+          unitPrice: prev.unitPrice === "" ? newUnitPrice : prev.unitPrice,
+          totalPrice: prev.unitPrice === "" ? newTotalPrice : prev.totalPrice,
         }));
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     }
-  }, [form.item, items]);
+  }, [form.item, items, form.quantity]);
 
   const filteredItems = items.filter((i) =>
     i.name.toLowerCase().includes(productSearch.toLowerCase()),
@@ -265,69 +319,91 @@ export default function CreateProcurementScreen() {
               )}
             </View>
 
-            <View style={styles.row}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={[styles.label, { color: colors.secondary }]}>
-                  Miqdori
-                </Text>
-                <View
-                  style={[
-                    styles.inputContainer,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="0"
-                    placeholderTextColor={colors.secondary}
-                    keyboardType="numeric"
-                    value={form.quantity}
-                    onChangeText={(val) => setForm({ ...form, quantity: val })}
-                  />
-                  <Text style={[styles.unitBadge, { color: colors.primary }]}>
-                    {form.unit}
+            <View style={[styles.pricingCard, { backgroundColor: colors.primary + "08", borderColor: colors.primary + "20" }]}>
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, { flex: 1 }]}>
+                  <Text style={[styles.label, { color: colors.secondary }]}>
+                    Miqdori
                   </Text>
+                  <View
+                    style={[
+                      styles.inputContainer,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      placeholder="0"
+                      placeholderTextColor={colors.secondary}
+                      keyboardType="numeric"
+                      value={form.quantity}
+                      onChangeText={handleQuantityChange}
+                    />
+                    <Text style={[styles.unitBadge, { color: colors.primary }]}>
+                      {form.unit}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.inputGroup, { flex: 1.2 }]}>
+                  <Text style={[styles.label, { color: colors.secondary }]}>
+                    Birlik narxi (1 {form.unit})
+                  </Text>
+                  <View
+                    style={[
+                      styles.inputContainer,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      placeholder="0"
+                      placeholderTextColor={colors.secondary}
+                      keyboardType="numeric"
+                      value={form.unitPrice}
+                      onChangeText={handleUnitPriceChange}
+                    />
+                    <Text style={[styles.unitBadge, { color: colors.secondary }]}>
+                      UZS
+                    </Text>
+                  </View>
                 </View>
               </View>
-              <View style={[styles.inputGroup, { flex: 1.2 }]}>
-                <Text style={[styles.label, { color: colors.secondary }]}>
-                  Birlik narxi (1 {form.unit} uchun)
+
+              <View style={[styles.inputGroup, { marginTop: 16 }]}>
+                <Text style={[styles.label, { color: colors.primary }]}>
+                  Umumiy narx
                 </Text>
                 <View
                   style={[
                     styles.inputContainer,
                     {
                       backgroundColor: colors.card,
-                      borderColor: colors.border,
+                      borderColor: colors.primary + "50",
+                      borderWidth: 2,
+                      height: 64,
                     },
                   ]}
                 >
                   <TextInput
-                    style={[styles.input, { color: colors.text }]}
+                    style={[styles.input, { color: colors.text, fontSize: 20, fontWeight: "800" }]}
                     placeholder="0"
                     placeholderTextColor={colors.secondary}
                     keyboardType="numeric"
-                    value={form.unitPrice}
-                    onChangeText={(val) => setForm({ ...form, unitPrice: val })}
+                    value={form.totalPrice}
+                    onChangeText={handleTotalPriceChange}
                   />
-                  <Text style={[styles.unitBadge, { color: colors.secondary }]}>
+                  <Text style={[styles.unitBadge, { color: colors.primary, fontSize: 16 }]}>
                     UZS
                   </Text>
                 </View>
               </View>
             </View>
-
-            {(form.quantity && form.unitPrice) ? (
-              <View style={{ alignItems: 'flex-end', marginTop: -12 }}>
-                <Text style={{ fontSize: 13, color: colors.secondary, fontWeight: '600' }}>Jami hisoblangan summa:</Text>
-                <Text style={{ fontSize: 20, color: colors.primary, fontWeight: '800', marginTop: 2 }}>
-                  {(parseFloat(form.quantity) * parseFloat(form.unitPrice)).toLocaleString()} UZS
-                </Text>
-              </View>
-            ) : null}
 
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.secondary }]}>
@@ -600,6 +676,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     paddingHorizontal: 16,
     gap: 12,
+  },
+  pricingCard: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   nameInput: {
     flex: 1,

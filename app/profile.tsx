@@ -69,27 +69,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(t.deleteAccount, t.confirmDelete, [
-      { text: common.cancel, style: "cancel" },
-      {
-        text: common.delete,
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const token = await Storage.getItem("access_token");
-            await axios.delete(`${CONFIG.API_BASE_URL}/users/me`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            await handleLogout();
-            Alert.alert("Muvaffaqiyat", t.deleteSuccess);
-          } catch {
-            Alert.alert(common.error, "Hisobni o'chirishda xato yuz berdi");
-          }
-        },
-      },
-    ]);
-  };
 
   return (
     <SafeAreaView
@@ -172,6 +151,29 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
 
+          {user?.role === "owner" && (
+            <TouchableOpacity
+              style={[styles.menuItem, { backgroundColor: colors.card }]}
+              onPress={() => router.push("/system-settings")}
+            >
+              <View style={styles.menuItemLeft}>
+                <MaterialCommunityIcons
+                  name="cog-outline"
+                  size={24}
+                  color={colors.primary}
+                />
+                <Text style={[styles.menuText, { color: colors.text }]}>
+                  Tizim Sozlamalari
+                </Text>
+              </View>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={24}
+                color={colors.border}
+              />
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={[styles.menuItem, { backgroundColor: colors.card }]}
             onPress={() => router.push("/privacy-policy")}
@@ -209,21 +211,7 @@ export default function ProfileScreen() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.menuItem, { backgroundColor: colors.card }]}
-            onPress={handleDeleteAccount}
-          >
-            <View style={styles.menuItemLeft}>
-              <MaterialCommunityIcons
-                name="account-remove-outline"
-                size={24}
-                color={colors.danger}
-              />
-              <Text style={[styles.menuText, { color: colors.danger }]}>
-                {t.deleteAccount}
-              </Text>
-            </View>
-          </TouchableOpacity>
+
         </View>
       </ScrollView>
     </SafeAreaView>

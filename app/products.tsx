@@ -311,13 +311,18 @@ export default function ProductsScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.welcomeText, { color: colors.secondary }]}>
-            Omborxona
-          </Text>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {t.title}
-          </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <MaterialCommunityIcons name="arrow-left" size={28} color={colors.text} />
+          </TouchableOpacity>
+          <View>
+            <Text style={[styles.welcomeText, { color: colors.secondary }]}>
+              Omborxona
+            </Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {t.title}
+            </Text>
+          </View>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity

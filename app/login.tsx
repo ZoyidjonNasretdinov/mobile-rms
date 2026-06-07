@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -55,6 +56,24 @@ export default function LoginScreen() {
   const passwordRef = useRef<TextInput>(null);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputShake = useSharedValue(0);
+
+  const [restaurantName, setRestaurantName] = useState(t.title);
+  const [restaurantLogo, setRestaurantLogo] = useState("");
+
+  React.useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await axios.get(`${CONFIG.API_BASE_URL}/settings`);
+        if (res.data) {
+          if (res.data.restaurantName) setRestaurantName(res.data.restaurantName);
+          if (res.data.restaurantLogo) setRestaurantLogo(res.data.restaurantLogo);
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const buttonScale = useSharedValue(1);
   const buttonStyle = useAnimatedStyle(() => ({
@@ -216,55 +235,48 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <View style={styles.flex}>
+        {/* Background Blobs for Premium Feel */}
+        <View style={styles.blob1} />
+        <View style={styles.blob2} />
+        
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          {/* Logo & Title */}
-          <Animated.View
-            entering={FadeInUp.delay(100).duration(700)}
-            style={styles.headerContainer}
-          >
+          <View style={styles.headerContainer}>
             <View style={styles.logoIconContainer}>
-              <MaterialCommunityIcons name="chef-hat" size={42} color="white" />
+              {restaurantLogo ? (
+                <Image source={{ uri: restaurantLogo }} style={{ width: 168, height: 168, borderRadius: 56 }} />
+              ) : (
+                <MaterialCommunityIcons name="chef-hat" size={84} color="white" />
+              )}
             </View>
-            <Text style={styles.title}>{t.title}</Text>
+            <Text style={styles.title}>{restaurantName}</Text>
             <Text style={styles.subtitle}>{t.subtitle}</Text>
-          </Animated.View>
+          </View>
 
           {/* Login Card */}
-          <Animated.View
-            entering={FadeInDown.delay(300).duration(700)}
-            style={styles.card}
-          >
+          <View style={styles.card}>
             <Text style={styles.loginTitle}>{t.loginTitle}</Text>
             <Text style={styles.loginSubtitle}>{t.loginSubtitle}</Text>
 
-            <Animated.View style={[styles.form, shakeStyle]}>
+            <View style={styles.form}>
               {/* Phone Input */}
               <View>
                 <Text style={styles.label}>{t.phoneLabel}</Text>
                 <View
                   style={[
                     styles.inputContainer,
-                    focusedInput === "phone" && styles.inputContainerFocused,
                     localError && !password && styles.inputContainerError,
                   ]}
                 >
                   <MaterialCommunityIcons
                     name="phone-outline"
                     size={20}
-                    color={
-                      focusedInput === "phone"
-                        ? Colors.light.primary
-                        : Colors.light.secondary
-                    }
+                    color={Colors.light.secondary}
                     style={styles.inputIcon}
                   />
                   <TextInput
@@ -274,15 +286,8 @@ export default function LoginScreen() {
                     keyboardType="phone-pad"
                     value={phone}
                     onChangeText={handlePhoneChange}
-                    onFocus={() => handleFocus("phone")}
-                    onBlur={handleBlur}
                     autoCapitalize="none"
-                    autoComplete="tel"
-                    textContentType="telephoneNumber"
                     maxLength={19}
-                    returnKeyType="next"
-                    blurOnSubmit={false}
-                    onSubmitEditing={() => passwordRef.current?.focus()}
                   />
                   {phone.length > 0 && (
                     <TouchableOpacity
@@ -305,19 +310,13 @@ export default function LoginScreen() {
                 <View
                   style={[
                     styles.inputContainer,
-                    focusedInput === "password" &&
-                      styles.inputContainerFocused,
                     localError && phone && styles.inputContainerError,
                   ]}
                 >
                   <MaterialCommunityIcons
                     name="lock-outline"
                     size={20}
-                    color={
-                      focusedInput === "password"
-                        ? Colors.light.primary
-                        : Colors.light.secondary
-                    }
+                    color={Colors.light.secondary}
                     style={styles.inputIcon}
                   />
                   <TextInput
@@ -327,8 +326,6 @@ export default function LoginScreen() {
                     secureTextEntry={!showPassword}
                     value={password}
                     onChangeText={setPassword}
-                    onFocus={() => handleFocus("password")}
-                    onBlur={handleBlur}
                     autoComplete="off"
                     importantForAutofill="no"
                     textContentType="none"
@@ -384,14 +381,11 @@ export default function LoginScreen() {
                   )}
                 </TouchableOpacity>
               </Animated.View>
-            </Animated.View>
-          </Animated.View>
+            </View>
+          </View>
 
           {/* Demo Accounts Section */}
-          <Animated.View
-            entering={FadeInDown.delay(500).duration(700)}
-            style={styles.demoSection}
-          >
+          <View style={styles.demoSection}>
             <TouchableOpacity
               style={styles.demoToggleBtn}
               onPress={() => {
@@ -442,7 +436,7 @@ export default function LoginScreen() {
                 ))}
               </View>
             )}
-          </Animated.View>
+          </View>
 
           {/* Footer */}
           <View style={styles.footer}>
@@ -457,7 +451,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -475,26 +469,27 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingTop: Platform.OS === "android" ? 60 : 40,
     paddingBottom: 40,
-    justifyContent: "center",
   },
   headerContainer: {
     alignItems: "center",
     marginBottom: 36,
   },
   logoIconContainer: {
-    width: 84,
-    height: 84,
-    borderRadius: 28,
+    width: 168,
+    height: 168,
+    borderRadius: 56,
     backgroundColor: Colors.light.primary,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 24,
+    borderWidth: 4,
+    borderColor: "rgba(255, 255, 255, 0.8)",
     ...Platform.select({
       ios: {
         shadowColor: Colors.light.primary,
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 16 },
+        shadowOpacity: 0.4,
+        shadowRadius: 24,
       },
       android: { elevation: 12 },
     }),
@@ -507,23 +502,25 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 16,
     color: "#64748B",
     textAlign: "center",
-    lineHeight: 22,
-    maxWidth: "80%",
+    lineHeight: 24,
+    maxWidth: "85%",
   },
   card: {
-    backgroundColor: "white",
-    borderRadius: 32,
-    padding: 28,
-    marginBottom: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderRadius: 36,
+    padding: 32,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.5)",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 20 },
-        shadowOpacity: 0.08,
-        shadowRadius: 30,
+        shadowColor: "#8B5CF6",
+        shadowOffset: { width: 0, height: 24 },
+        shadowOpacity: 0.12,
+        shadowRadius: 40,
       },
       android: { elevation: 10 },
     }),
@@ -552,12 +549,10 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F1F5F9",
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    borderWidth: 2,
-    borderColor: "transparent",
-    height: 60,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    height: 64,
   },
   inputContainerFocused: {
     borderColor: Colors.light.primary + "50",
@@ -610,16 +605,16 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: Colors.light.primary,
-    borderRadius: 20,
-    height: 60,
+    borderRadius: 24,
+    height: 64,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 12,
     ...Platform.select({
       ios: {
         shadowColor: Colors.light.primary,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.4,
         shadowRadius: 20,
       },
       android: { elevation: 8 },
@@ -702,10 +697,30 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 12,
   },
   footerLink: {
-    fontSize: 13,
+    fontSize: 14,
     color: "#94A3B8",
+  },
+  blob1: {
+    position: "absolute",
+    top: -120,
+    right: -100,
+    width: 350,
+    height: 350,
+    borderRadius: 175,
+    backgroundColor: Colors.light.primary,
+    opacity: 0.12,
+  },
+  blob2: {
+    position: "absolute",
+    bottom: -80,
+    left: -120,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: "#FF9F1C",
+    opacity: 0.08,
   },
 });

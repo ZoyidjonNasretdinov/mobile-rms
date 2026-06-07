@@ -55,8 +55,9 @@ export default function DaySummaryScreen() {
 
   if (!data) return null;
 
-  const { stats, inventory, expenses, shift } = data;
-  const isMatched = Math.abs(stats.discrepancy) < 100; // Small threshold
+  const { stats = {}, inventory = [], expenses = [], shift = {} } = data;
+  const discrepancy = stats.discrepancyCash ?? stats.discrepancy ?? 0;
+  const isMatched = Math.abs(discrepancy) < 100; // Small threshold
 
   const SummaryCard = ({ title, value, label, icon, color, subValue }: any) => (
     <View style={[styles.card, { backgroundColor: colors.card }]}>
@@ -133,19 +134,19 @@ export default function DaySummaryScreen() {
         <View style={styles.grid}>
           <SummaryCard
             title="Kassa (Tushum)"
-            value={`${stats.actualCash.toLocaleString()} so'm`}
-            subValue={`Kutilgan: ${stats.expectedCash.toLocaleString()}`}
+            value={`${(stats.actualCash || 0).toLocaleString()} so'm`}
+            subValue={`Kutilgan: ${(stats.expectedCash || 0).toLocaleString()}`}
             label={
-              stats.discrepancy === 0
+              discrepancy === 0
                 ? "Farq yo'q"
-                : `${stats.discrepancy > 0 ? "+" : ""}${stats.discrepancy.toLocaleString()} so'm farq`
+                : `${discrepancy > 0 ? "+" : ""}${discrepancy.toLocaleString()} so'm farq`
             }
             icon="cash-register"
             color={isMatched ? colors.success : colors.danger}
           />
           <SummaryCard
             title="Harajatlar"
-            value={`${stats.totalExpenses.toLocaleString()} so'm`}
+            value={`${(stats.totalExpenses || 0).toLocaleString()} so'm`}
             label={`${expenses.length} ta xarid va to'lovlar`}
             icon="cart-arrow-down"
             color={colors.warning}

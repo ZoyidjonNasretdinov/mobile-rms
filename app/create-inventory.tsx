@@ -37,12 +37,32 @@ export default function CreateInventoryScreen() {
   const insets = useSafeAreaInsets();
 
   const [form, setForm] = useState({
-    name: (params.name as string) || "",
-    categoryId: (params.categoryId as string) || "",
-    unit: (params.unit as string) || "kg",
-    stock: (params.stock as string) || "",
-    minStock: (params.minStock as string) || "10",
+    name: "",
+    categoryId: "",
+    unit: "kg",
+    stock: "",
+    minStock: "10",
   });
+
+  useEffect(() => {
+    if (params.id) {
+      setForm({
+        name: (params.name as string) || "",
+        categoryId: (params.categoryId as string) || "",
+        unit: (params.unit as string) || "kg",
+        stock: (params.stock as string) || "",
+        minStock: (params.minStock as string) || "10",
+      });
+    } else {
+      setForm({
+        name: "",
+        categoryId: "",
+        unit: "kg",
+        stock: "",
+        minStock: "10",
+      });
+    }
+  }, [params.id, params.name, params.categoryId, params.unit, params.stock, params.minStock]);
 
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

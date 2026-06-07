@@ -37,15 +37,35 @@ export default function CreateStaffScreen() {
   const insets = useSafeAreaInsets();
 
   const [form, setForm] = useState({
-    fullName: (params.fullName as string) || "",
-    phone: (params.phoneNumber as string) || (params.phone as string) || "",
+    fullName: "",
+    phone: "",
     password: "",
-    role: (params.role as string) || "",
-    extraRoles: (params.extraRoles as string)
-      ? (params.extraRoles as string).split(",")
-      : [],
+    role: "",
+    extraRoles: [] as string[],
   });
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (params.id) {
+      setForm({
+        fullName: (params.fullName as string) || "",
+        phone: (params.phoneNumber as string) || (params.phone as string) || "",
+        password: "",
+        role: (params.role as string) || "",
+        extraRoles: (params.extraRoles as string)
+          ? (params.extraRoles as string).split(",")
+          : [],
+      });
+    } else {
+      setForm({
+        fullName: "",
+        phone: "",
+        password: "",
+        role: "",
+        extraRoles: [],
+      });
+    }
+  }, [params.id, params.fullName, params.phone, params.phoneNumber, params.role, params.extraRoles]);
 
   const roles = [
     { label: Translations.uz.auth.waiter, value: "ofisiant" },

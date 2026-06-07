@@ -39,14 +39,38 @@ export default function CreateProductScreen() {
   const colors = Colors[colorScheme];
 
   const [form, setForm] = useState({
-    name: (params.name as string) || "",
-    category: (params.category as string) || "Boshqalar",
-    unit: (params.unit as string) || "kg",
-    minThreshold: (params.minThreshold as string) || "0",
-    currentStock: (params.currentStock as string) || "0",
-    costPerUnit: (params.costPerUnit as string) || "0",
-    icon: (params.icon as string) || "package-variant-closed",
+    name: "",
+    category: "Boshqalar",
+    unit: "kg",
+    minThreshold: "0",
+    currentStock: "0",
+    costPerUnit: "0",
+    icon: "package-variant-closed",
   });
+
+  useEffect(() => {
+    if (params.id) {
+      setForm({
+        name: (params.name as string) || "",
+        category: (params.category as string) || "Boshqalar",
+        unit: (params.unit as string) || "kg",
+        minThreshold: (params.minThreshold as string) || "0",
+        currentStock: (params.currentStock as string) || "0",
+        costPerUnit: (params.costPerUnit as string) || "0",
+        icon: (params.icon as string) || "package-variant-closed",
+      });
+    } else {
+      setForm({
+        name: "",
+        category: "Boshqalar",
+        unit: "kg",
+        minThreshold: "0",
+        currentStock: "0",
+        costPerUnit: "0",
+        icon: "package-variant-closed",
+      });
+    }
+  }, [params.id, params.name, params.category, params.unit, params.minThreshold, params.currentStock, params.costPerUnit, params.icon]);
 
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

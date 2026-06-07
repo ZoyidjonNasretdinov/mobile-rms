@@ -635,33 +635,55 @@ export default function WaiterStationScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       <View style={styles.header}>
-        <View style={styles.headerTitleRow}>
-          <View style={[styles.titleIcon, { backgroundColor: colors.accent }]}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <TouchableOpacity
+            onPress={handleHeaderAction}
+            style={[
+              styles.logoutButton,
+              {
+                backgroundColor: colors.card,
+                width: 44,
+                height: 44,
+                borderRadius: 15,
+                justifyContent: "center",
+                alignItems: "center",
+              },
+            ]}
+          >
             <MaterialCommunityIcons
-              name="shopping-outline"
+              name={user?.role === "owner" ? "arrow-left" : "logout"}
               size={24}
-              color="white"
+              color={colors.text}
             />
-          </View>
+          </TouchableOpacity>
           <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {t.title}
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: colors.secondary }]}>
+            <Text style={[styles.headerSubtitle, { color: colors.secondary, marginBottom: 2 }]}>
               {user?.fullName || "Waiter"}
+            </Text>
+            <Text style={[styles.headerTitle, { color: colors.text, fontSize: 24, fontWeight: "800" }]}>
+              {t.title}
             </Text>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleHeaderAction}
+        <View
+          style={[
+            styles.titleIcon,
+            {
+              backgroundColor: colors.accent,
+              width: 44,
+              height: 44,
+              borderRadius: 15,
+              justifyContent: "center",
+              alignItems: "center",
+            },
+          ]}
         >
           <MaterialCommunityIcons
-            name={user?.role === "owner" ? "arrow-left" : "logout"}
+            name="shopping-outline"
             size={24}
-            color={colors.secondary}
+            color="white"
           />
-        </TouchableOpacity>
+        </View>
       </View>
 
       {!isShiftActive && (

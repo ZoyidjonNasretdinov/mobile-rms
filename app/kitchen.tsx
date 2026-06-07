@@ -541,30 +541,40 @@ export default function KitchenScreen() {
         >
           <View style={styles.headerTop}>
             <View style={styles.headerInfo}>
-              <View style={styles.headerIconContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.logoutBtn,
+                  {
+                    backgroundColor: "rgba(255,255,255,0.2)",
+                    width: 44,
+                    height: 44,
+                    borderRadius: 15,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  },
+                ]}
+                onPress={handleHeaderAction}
+              >
                 <MaterialCommunityIcons
-                  name={roleConfig.icon as any}
-                  size={32}
+                  name={
+                    user?.role === "owner" || paramDept ? "arrow-left" : "logout"
+                  }
+                  size={24}
                   color="white"
                 />
-              </View>
+              </TouchableOpacity>
               <View>
                 <Text style={styles.headerRole}>{roleConfig.label}</Text>
                 <Text style={styles.headerTitle}>{roleConfig.title}</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.logoutBtn}
-              onPress={handleHeaderAction}
-            >
+            <View style={styles.headerIconContainer}>
               <MaterialCommunityIcons
-                name={
-                  user?.role === "owner" || paramDept ? "arrow-left" : "logout"
-                }
-                size={24}
+                name={roleConfig.icon as any}
+                size={32}
                 color="white"
               />
-            </TouchableOpacity>
+            </View>
           </View>
         </View>
 

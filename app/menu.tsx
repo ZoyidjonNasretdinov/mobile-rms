@@ -155,13 +155,25 @@ export default function MenuScreen() {
       edges={["top", "left", "right"]}
     >
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.welcomeText, { color: colors.secondary }]}>
-            Restoran
-          </Text>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {t.title}
-          </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.headerBtn, { backgroundColor: colors.card, width: 44, height: 44, borderRadius: 15 }]}
+          >
+            <MaterialCommunityIcons
+              name="arrow-left"
+              size={24}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+          <View>
+            <Text style={[styles.welcomeText, { color: colors.secondary, marginBottom: 2 }]}>
+              Restoran
+            </Text>
+            <Text style={[styles.headerTitle, { color: colors.text, fontSize: 24 }]}>
+              {t.title}
+            </Text>
+          </View>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity

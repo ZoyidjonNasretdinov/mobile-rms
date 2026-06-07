@@ -23,7 +23,6 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import axios from "axios";
 import { socketService } from "@/utils/socket";
 import { CONFIG } from "@/constants/config";
-import { PDFService } from "@/utils/pdf-service";
 
 import { Translations } from "@/constants/translations";
 
@@ -889,46 +888,6 @@ export default function DashboardScreen() {
                 )}
 
                 <View style={{ gap: 10, marginBottom: 20 }}>
-                  <TouchableOpacity
-                    style={[
-                      styles.closeReportBtn,
-                      {
-                        backgroundColor: colors.success + "15",
-                        marginTop: 0,
-                        paddingVertical: 12,
-                      },
-                    ]}
-                    onPress={() => {
-                      if (eodReport) {
-                        PDFService.generateEodPDF(eodReport);
-                      } else {
-                        Alert.alert("Xato", "Hisobot ma'lumotlari yuklanmagan");
-                      }
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <MaterialCommunityIcons
-                        name="file-pdf-box"
-                        size={24}
-                        color={colors.success}
-                      />
-                      <Text
-                        style={[
-                          styles.submitBtnText,
-                          { color: colors.success },
-                        ]}
-                      >
-                        {Translations.uz.eodReport.exportPdf}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-
                   <TouchableOpacity
                     style={[
                       styles.closeReportBtn,

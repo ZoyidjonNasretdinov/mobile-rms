@@ -52,6 +52,7 @@ export default function ReportsScreen() {
   const [topSold, setTopSold] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [activeShift, setActiveShift] = useState<any>(null);
+  const [shifts, setShifts] = useState<any[]>([]);
   const [isShiftActive, setIsShiftActive] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [cashValue, setCashValue] = useState("");
@@ -92,11 +93,21 @@ export default function ReportsScreen() {
   const fetchShiftStatus = useCallback(async () => {
     try {
       const token = await Storage.getItem("access_token");
-      const shiftRes = await axios.get(`${API_BASE_URL}/shifts/active`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const [shiftRes, allShiftsRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/shifts/active`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_BASE_URL}/shifts`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      ]);
       setActiveShift(shiftRes.data);
       setIsShiftActive(!!shiftRes.data);
+      
+      const sortedShifts = (allShiftsRes.data || []).sort(
+        (a: any, b: any) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+      );
+      setShifts(sortedShifts);
     } catch (error) {
       console.error("Shift fetch error:", error);
     }
@@ -379,6 +390,49 @@ export default function ReportsScreen() {
                     )}
                   </View>
                 </View>
+
+                {shifts.length > 0 && (
+                  <View style={{ marginTop: 25 }}>
+                    <Text style={{ fontSize: 18, fontWeight: "bold", color: colors.text, marginBottom: 15 }}>
+                      Barcha Hisobotlar
+                    </Text>
+                    {shifts.map((shift, index) => (
+                      <TouchableOpacity
+                        key={shift._id || index}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          backgroundColor: colors.card,
+                          padding: 16,
+                          borderRadius: 20,
+                          marginBottom: 10,
+                        }}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/day-summary",
+                            params: { shiftId: shift._id },
+                          })
+                        }
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: colors.text, fontSize: 16, fontWeight: "bold" }}>
+                            {new Date(shift.startTime).toLocaleDateString("uz-UZ", { day: 'numeric', month: 'long', year: 'numeric' })} smenasi
+                          </Text>
+                          <Text style={{ color: colors.secondary, fontSize: 13, marginTop: 4 }}>
+                            {new Date(shift.startTime).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
+                            {" - "}
+                            {shift.endTime ? new Date(shift.endTime).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" }) : "Davom etmoqda"}
+                          </Text>
+                        </View>
+                        <MaterialCommunityIcons
+                          name="file-chart"
+                          size={24}
+                          color={colors.primary}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
             )}
 
@@ -524,16 +578,6 @@ export default function ReportsScreen() {
               ))}
             </View>
 
-            <TouchableOpacity
-              style={[styles.exportBtn, { backgroundColor: colors.primary }]}
-            >
-              <MaterialCommunityIcons
-                name="file-pdf-box"
-                size={24}
-                color="white"
-              />
-              <Text style={styles.exportBtnText}>{t.exportPdf}</Text>
-            </TouchableOpacity>
             <View style={{ height: 40 }} />
           </ScrollView>
 
@@ -719,16 +763,6 @@ const styles = StyleSheet.create({
   },
   itemName: { fontSize: 15, fontWeight: "700", marginBottom: 2 },
   itemCount: { fontSize: 14, fontWeight: "800" },
-  exportBtn: {
-    height: 60,
-    borderRadius: 20,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 10,
-  },
-  exportBtnText: { color: "white", fontSize: 16, fontWeight: "800" },
   shiftSection: { marginBottom: 25 },
   shiftStatusCard: {
     padding: 20,

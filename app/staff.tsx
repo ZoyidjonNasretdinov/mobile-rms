@@ -111,7 +111,7 @@ export default function StaffManagementScreen() {
   const filteredStaff = staff.filter((s) => {
     const matchesSearch =
       s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.phone.includes(searchQuery);
+      (s.phone || s.phoneNumber || "").includes(searchQuery);
 
     const matchesFilter =
       statusFilter === "all" ||
@@ -209,7 +209,7 @@ export default function StaffManagementScreen() {
             color={colors.secondary}
           />
           <Text style={[styles.contactText, { color: colors.secondary }]}>
-            {item.phone}
+            {item.phone || item.phoneNumber}
           </Text>
         </View>
       </View>
@@ -234,7 +234,7 @@ export default function StaffManagementScreen() {
               params: {
                 id: item._id,
                 fullName: item.fullName,
-                phone: item.phone,
+                phone: item.phone || item.phoneNumber,
                 role: item.role,
                 extraRoles: item.extraRoles?.join(","),
               },
